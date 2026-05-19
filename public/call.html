@@ -233,9 +233,11 @@
 
       pc.ontrack = e => {
         const audio = $('remote-audio');
-        audio.srcObject = e.streams[0];
+        const stream = e.streams[0] || new MediaStream([e.track]);
+        audio.srcObject = stream;
+        audio.volume = 1;
+        audio.muted = false;
         tryPlayAudio(audio);
-        // トラックが届いたら接続成功とみなしてタイマー開始
         onCallConnected();
       };
 
