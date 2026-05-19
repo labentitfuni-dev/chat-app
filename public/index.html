@@ -369,6 +369,18 @@
   <img id="img-modal-img" src="">
 </div>
 
+<!-- 友達削除確認モーダル -->
+<div class="modal-overlay" id="remove-friend-modal">
+  <div class="modal-box">
+    <h3>友達を削除</h3>
+    <p style="text-align:center;color:#888;font-size:14px;margin-bottom:20px"><strong id="remove-friend-name"></strong> を友達から削除しますか？</p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="$('remove-friend-modal').style.display='none'">キャンセル</button>
+      <button class="btn-confirm" style="background:#e53935" id="remove-friend-confirm">削除</button>
+    </div>
+  </div>
+</div>
+
 <!-- 友達追加モーダル -->
 <div class="modal-overlay" id="add-friend-modal">
   <div class="modal-box">
@@ -582,6 +594,57 @@
     renderFriends();
   }
 
+  // 友達削除：アイコン4回タップで発動
+  const tapCount = {};
+  const tapTimer = {};
+  function handleAvatarTap(u, avatarEl) {
+    const id = u.id;
+    tapCount[id] = (tapCount[id] || 0) + 1;
+    clearTimeout(tapTimer[id]);
+    // 2秒以内に4回タップしなければリセット
+    tapTimer[id] = setTimeout(() => { tapCount[id] = 0; }, 2000);
+    if (tapCount[id] >= 4) {
+      tapCount[id] = 0;
+      openRemoveFriendModal(u);
+    }
+  }
+
+  function openRemoveFriendModal(u) {
+    $('remove-friend-name').textContent = u.displayName || u.username;
+    $('remove-friend-modal').style.display = 'flex';
+    $('remove-friend-confirm').onclick = async () => {
+      $('remove-friend-confirm').textContent = '削除中...';
+      $('remove-friend-confirm').disabled = true;
+      try {
+        const res = await fetch('/api/auth/remove-friend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ friendId: u.id })
+        });
+        if (res.ok) {
+          friends = friends.filter(f => f.id !== u.id);
+          if (currentContact?.id === u.id) {
+            currentContact = null;
+            $('chat-panel').classList.remove('show');
+            $('sidebar').classList.remove('hidden');
+            $('messages').style.display = 'none';
+            $('input-area').style.display = 'none';
+            $('chat-header').style.display = 'none';
+          }
+          renderFriends();
+          showToast('友達を削除しました');
+        } else {
+          showToast('削除に失敗しました');
+        }
+      } catch { showToast('削除に失敗しました'); }
+      finally {
+        $('remove-friend-modal').style.display = 'none';
+        $('remove-friend-confirm').textContent = '削除';
+        $('remove-friend-confirm').disabled = false;
+      }
+    };
+  }
+
   function renderFriends() {
     const makeItem = (u, onclick) => {
       const online = onlineSet.has(u.id);
@@ -596,6 +659,9 @@
           <div class="contact-name">${u.displayName || u.username}</div>
           <div class="contact-status ${online?'online':''}">${online ? 'オンライン' : 'オフライン'}</div>
         </div>`;
+      // アイコン4回タップで削除
+      const avatarEl = div.querySelector('.avatar');
+      avatarEl.addEventListener('click', (e) => { e.stopPropagation(); handleAvatarTap(u, avatarEl); });
       div.onclick = onclick;
       return div;
     };

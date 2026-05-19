@@ -113,6 +113,17 @@ router.get('/friends', async (req, res) => {
   } catch { res.status(401).json({ error: 'トークンが無効です' }); }
 });
 
+router.post('/remove-friend', async (req, res) => {
+  try {
+    const { id } = verifyToken(req);
+    const { friendId } = req.body;
+    if (!friendId) return res.status(400).json({ error: 'friendIdが必要です' });
+    await User.findByIdAndUpdate(id,       { $pull: { friends: friendId } });
+    await User.findByIdAndUpdate(friendId, { $pull: { friends: id } });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 router.post('/notif-setting', async (req, res) => {
   try {
     const { id } = verifyToken(req);
