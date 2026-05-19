@@ -45,6 +45,7 @@
     .btn-mute    { width: 64px; height: 64px; font-size: 26px; background: #2a2a3e; color: white; }
     .btn-mute.active { background: #e53935; }
     .btn-end     { width: 76px; height: 76px; font-size: 32px; background: #e53935; color: white; }
+    .btn-end span { display: inline-block; transform: rotate(135deg); }
     .btn-speaker { width: 64px; height: 64px; font-size: 26px; background: #2a2a3e; color: white; }
     .btn-speaker.active { background: #06C755; }
 
@@ -79,7 +80,7 @@
         <span class="btn-label">ミュート</span>
       </div>
       <div class="btn-wrap">
-        <button class="btn btn-end" onclick="endCall(true)">📵</button>
+        <button class="btn btn-end" onclick="endCall(true)"><span>📞</span></button>
         <span class="btn-label">終了</span>
       </div>
       <div class="btn-wrap">
