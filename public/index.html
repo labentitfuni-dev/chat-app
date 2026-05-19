@@ -44,6 +44,10 @@
     #ios-install-banner { display: none; background: #fff; border-bottom: 1px solid #d0ecd8; padding: 10px 14px; font-size: 13px; color: #333; align-items: center; gap:10px; }
     #ios-install-banner span { flex: 1; line-height: 1.5; }
     #ios-banner-close { background: none; border: none; font-size: 18px; color: #aaa; cursor: pointer; flex-shrink: 0; }
+    #notif-banner { display: none; background: #fff8e1; border-bottom: 1px solid #ffe082; padding: 10px 14px; font-size: 13px; color: #333; align-items: center; gap: 10px; }
+    #notif-banner span { flex: 1; line-height: 1.5; }
+    #notif-banner-allow { background: #06C755; color: white; border: none; border-radius: 16px; padding: 6px 14px; font-size: 13px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+    #notif-banner-close { background: none; border: none; font-size: 18px; color: #aaa; cursor: pointer; flex-shrink: 0; }
 
     /* 自分のID表示 */
     #my-info { padding: 10px 16px; background: #f0faf4; border-bottom: 1px solid #e0f0e8; display: flex; align-items: center; gap: 12px; }
@@ -209,6 +213,11 @@
     <div id="ios-install-banner">
       <span>📲 ホーム画面に追加できます！<br>Safariの <strong>共有ボタン</strong> →「<strong>ホーム画面に追加</strong>」をタップ</span>
       <button id="ios-banner-close">✕</button>
+    </div>
+    <div id="notif-banner">
+      <span>🔔 通知を許可するとメッセージや着信が届きます</span>
+      <button id="notif-banner-allow" onclick="requestNotifPermission()">許可する</button>
+      <button id="notif-banner-close">✕</button>
     </div>
     <div id="my-info">
       <input type="file" id="avatar-input" accept="image/*" style="display:none">
@@ -880,8 +889,11 @@
       if (perm === 'granted') {
         await subscribePush(reg);
       } else if (perm === 'default') {
-        // 未決定 → ボタンを表示してユーザーに促す
+        // 未決定 → バナーとボタンを表示
         $('notif-btn').style.display = 'inline-flex';
+        if (!localStorage.getItem('notif-banner-dismissed')) {
+          $('notif-banner').style.display = 'flex';
+        }
       }
       // 'denied' の場合は何もしない
     } catch (e) {
@@ -898,8 +910,12 @@
     if (permission === 'granted') {
       const reg = await navigator.serviceWorker.ready;
       await subscribePush(reg);
+      $('notif-banner').style.display = 'none';
+      $('notif-btn').style.display = 'none';
       showToast('通知を有効にしました');
     } else {
+      $('notif-banner').style.display = 'none';
+      localStorage.setItem('notif-banner-dismissed', '1');
       showToast('通知が許可されませんでした');
     }
   }
@@ -1007,6 +1023,11 @@
   $('ios-banner-close').onclick = () => {
     $('ios-install-banner').style.display = 'none';
     localStorage.setItem('ios-banner-dismissed', '1');
+  };
+
+  $('notif-banner-close').onclick = () => {
+    $('notif-banner').style.display = 'none';
+    localStorage.setItem('notif-banner-dismissed', '1');
   };
 </script>
 </body>
