@@ -344,6 +344,7 @@
     socket.on('callAccepted', onCallAccepted);
     socket.on('callRejected', () => { closeCallModal(); showToast('📵 相手が拒否しました'); });
     socket.on('callEnded', () => { closeCallModal(); showToast('通話終了'); });
+    socket.on('callFailed', ({ reason }) => { closeCallModal(); showToast('📵 ' + (reason || '相手はオフラインです')); });
     socket.on('iceCandidate', async ({ candidate }) => {
       if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
     });
@@ -653,16 +654,18 @@
     currentCallContact = contact;
     currentJitsiUrl = callUrl;
 
-    // Socket.io で相手に着信通知（Jitsi URLを signal に乗せる）
+    // ① Socket.io で相手に着信通知（着信音・モーダル用）
     socket.emit('callUser', { toUserId: contact.id, signal: { jitsiUrl: callUrl } });
 
-    // 発信中モーダル
-    showCallModal(contact, '発信中...', [
-      { label: '✕ キャンセル', cls: 'end', fn: () => {
-        socket.emit('rejectCall', { toUserId: contact.id });
-        closeCallModal();
-      }}
-    ]);
+    // ② チャットメッセージにもURLを送る（フォールバック・オフライン対応）
+    socket.emit('sendMessage', {
+      toUserId: contact.id,
+      text: `📞 通話リクエスト\n${me.displayName || me.username} から着信です。\nタップして参加 👇\n${callUrl}`,
+      file: null
+    });
+
+    // ③ 発信者はすぐ通話ルームへ（相手の応答を待たない）
+    window.open(callUrl, '_blank');
   }
 
   function onIncomingCall({ fromId, fromName, signal }) {
