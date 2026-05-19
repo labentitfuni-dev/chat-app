@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./generate-icons').generate();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
