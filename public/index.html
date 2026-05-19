@@ -117,7 +117,7 @@
     .bubble.other { background: white; color: #333; border-bottom-left-radius: 4px; }
     .msg-time { font-size: 10px; margin-top: 3px; opacity: 0.6; text-align: right; }
     #input-area { display: none; padding: 10px; background: white; border-top: 1px solid #eee; gap: 8px; align-items: center; }
-    #msg-input { flex: 1; padding: 10px 16px; border: 1px solid #ddd; border-radius: 24px; font-size: 15px; outline: none; resize: none; }
+    #msg-input { flex: 1; padding: 10px 16px; border: 1px solid #ddd; border-radius: 24px; font-size: 16px; outline: none; resize: none; -webkit-text-size-adjust: 100%; }
     #msg-input:focus { border-color: #06C755; }
     #send-btn { padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 24px; font-size: 14px; font-weight: bold; cursor: pointer; }
 
@@ -1297,12 +1297,21 @@
     const adjustLayout = () => {
       if (!chatPanel.classList.contains('show')) return;
       const vv = window.visualViewport;
-      const offsetBottom = window.innerHeight - vv.height - vv.offsetTop;
-      chatPanel.style.bottom = Math.max(0, offsetBottom) + 'px';
+      const keyboardHeight = window.innerHeight - vv.height;
+      chatPanel.style.bottom = Math.max(0, keyboardHeight) + 'px';
+      // キーボードが出たときメッセージを最下部にスクロール
+      if (keyboardHeight > 100) {
+        const box = $('messages');
+        setTimeout(() => { box.scrollTop = box.scrollHeight; }, 100);
+      }
     };
     window.visualViewport.addEventListener('resize', adjustLayout);
-    window.visualViewport.addEventListener('scroll', adjustLayout);
   }
+
+  // 入力欄タップで確実にフォーカス
+  $('msg-input').addEventListener('touchstart', function() {
+    this.focus();
+  }, { passive: true });
 
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
