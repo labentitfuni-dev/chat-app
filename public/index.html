@@ -14,10 +14,10 @@
   <script src="/socket.io/socket.io.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-    body { background: #f0f0f0; height: 100vh; display: flex; flex-direction: column; }
+    body { background: #f0f0f0; min-height: 100vh; display: flex; flex-direction: column; }
 
     /* ログイン画面 */
-    #login-screen { position: fixed; inset: 0; background: #06C755; display: flex; flex-direction: column; align-items: center; justify-content: center; will-change: transform; }
+    #login-screen { flex: 1; background: #06C755; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 16px; min-height: 100vh; }
     .login-card { background: white; border-radius: 16px; padding: 28px 24px; width: calc(100% - 32px); max-width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
     .login-card h1 { text-align: center; font-size: 26px; margin-bottom: 4px; }
     .login-card p { text-align: center; color: #888; margin-bottom: 20px; }
@@ -1369,22 +1369,24 @@
         }
       }
 
-      // ログイン画面：キーボード分だけ上にずらす
-      if (loginScreen.style.display !== 'none') {
-        const shift = keyboardHeight > 50 ? Math.min(keyboardHeight * 0.6, keyboardHeight - 60) : 0;
-        loginScreen.style.transform = shift > 0 ? `translateY(-${shift}px)` : '';
+      // ログイン画面：キーボードが出たら入力欄が見えるようスクロール
+      if (loginScreen && loginScreen.style.display !== 'none' && keyboardHeight > 100) {
+        const active = document.activeElement;
+        if (active && active.tagName === 'INPUT') {
+          setTimeout(() => active.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        }
       }
     });
   }
 
-  // PWAスタンドアロンモードでログイン入力のキーボードが出ない対策
-  if (isInStandaloneMode()) {
-    ['username-input', 'password-input', 'displayname-input'].forEach(id => {
-      const el = $(id);
-      if (!el) return;
-      el.addEventListener('click', function() { this.focus(); });
+  // ログイン入力欄: touchendでfocus（iOSはtouchendからのfocusでキーボードが出る）
+  ['username-input', 'password-input', 'displayname-input'].forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('touchend', function(e) {
+      this.focus();
     });
-  }
+  });
 
   // 入力欄タップで確実にフォーカス
   $('msg-input').addEventListener('touchstart', function() {
