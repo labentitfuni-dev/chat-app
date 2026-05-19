@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { Message } = require('./models');
+const { sendPushNotification } = require('./push');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'chat-app-secret-key-change-in-production';
 const onlineUsers = new Map();
@@ -42,7 +43,19 @@ function setupSocket(io) {
       const out = { ...msg.toObject(), id: msg._id.toString() };
       socket.emit('newMessage', out);
       const toSocketId = onlineUsers.get(toUserId);
-      if (toSocketId) io.to(toSocketId).emit('newMessage', out);
+      if (toSocketId) {
+        io.to(toSocketId).emit('newMessage', out);
+      } else {
+        // 相手がオフラインならプッシュ通知を送る
+        const notifText = out.file ? '📎 ファイルが届きました' : out.text;
+        sendPushNotification(toUserId, {
+          title: socket.username,
+          body: notifText,
+          icon: '/icon.svg',
+          badge: '/icon.svg',
+          data: { fromId: socket.userId }
+        });
+      }
     });
 
     socket.on('markRead', async ({ fromUserId }) => {

@@ -16,6 +16,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use('/api/auth', require('./auth'));
 app.use('/api/upload', require('./upload'));
+app.use('/api/push', require('./push').router);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 const { setupSocket } = require('./socketHandler');
