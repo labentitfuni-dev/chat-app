@@ -48,7 +48,7 @@ function setupSocket(io) {
       } else {
         const notifText = out.file ? '📎 ファイルが届きました' : out.text;
         sendPushNotification(toUserId, {
-          title: 'ChatApp',
+          title: socket.username,
           body: notifText,
           icon: '/icon.svg',
           badge: '/icon.svg',
