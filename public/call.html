@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>通話中 - ChatApp</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { background: #1a1a2e; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; user-select: none; overflow: hidden; }
+
+    .avatar {
+      width: 120px; height: 120px; border-radius: 50%; background: #06C755;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 52px; font-weight: bold; color: white;
+      margin-bottom: 24px; position: relative; z-index: 1;
+    }
+    .avatar.ringing::before, .avatar.ringing::after {
+      content: ''; position: absolute; border-radius: 50%;
+      border: 3px solid rgba(6,199,85,0.35);
+      animation: ripple 1.6s ease-out infinite; z-index: -1;
+    }
+    .avatar.ringing::after { animation-delay: 0.8s; }
+    @keyframes ripple {
+      0%   { width: 120px; height: 120px; opacity: 1; }
+      100% { width: 220px; height: 220px; opacity: 0; }
+    }
+
+    #contact-name { font-size: 26px; font-weight: bold; margin-bottom: 10px; }
+    #status { font-size: 16px; color: #aaa; margin-bottom: 60px; min-height: 22px; }
+
+    .buttons { display: flex; gap: 36px; align-items: center; }
+    .btn {
+      width: 72px; height: 72px; border-radius: 50%; border: none;
+      font-size: 30px; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; transition: transform 0.1s, background 0.2s;
+    }
+    .btn:active { transform: scale(0.88); }
+    .btn-mute  { background: #2a2a3e; color: white; }
+    .btn-mute.muted { background: #555; }
+    .btn-speaker { background: #2a2a3e; color: white; }
+    .btn-end   { background: #e53935; color: white; width: 80px; height: 80px; font-size: 34px; }
+
+    #error-box {
+      display: none; flex-direction: column; align-items: center; gap: 20px; padding: 32px;
+      text-align: center;
+    }
+    #error-box p { color: #e57373; font-size: 17px; line-height: 1.5; }
+    #back-btn-err {
+      background: #06C755; color: white; border: none; border-radius: 24px;
+      padding: 12px 28px; font-size: 15px; font-weight: bold; cursor: pointer;
+    }
+
+    audio { display: none; }
+  </style>
+</head>
+<body>
+  <audio id="remote-audio" autoplay playsinline></audio>
+  <audio id="local-audio"  autoplay muted    playsinline></audio>
+
+  <div id="main">
+    <div class="avatar" id="avatar">?</div>
+    <div id="contact-name">接続中...</div>
+    <div id="status">相手を待っています...</div>
+    <div class="buttons">
+      <button class="btn btn-mute"    id="mute-btn"    onclick="toggleMute()">🎤</button>
+      <button class="btn btn-end"                      onclick="endCall(true)">📵</button>
+      <button class="btn btn-speaker" id="speaker-btn" onclick="toggleSpeaker()">🔊</button>
+    </div>
+  </div>
+
+  <div id="error-box">
+    <p id="error-msg">エラーが発生しました</p>
+    <button class="btn" id="back-btn-err" onclick="goBack()">← 戻る</button>
+  </div>
+
+  <script>
+    const params   = new URLSearchParams(location.search);
+    const roomId   = params.get('room');
+    const isInit   = params.get('initiator') === 'true';
+    const token    = localStorage.getItem('token');
+    const me       = JSON.parse(localStorage.getItem('user') || '{}');
+
+    if (!roomId || !token) { location.href = '/'; }
+
+    // ICE サーバー（STUN: 無料・登録不要）
+    const iceConfig = { iceServers: [
+      { urls: 'stun:stun.l.google.com:19302'  },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+    ]};
+
+    let pc = null, localStream = null;
+    let isMuted = false, timerSec = 0, timerInterval = null;
+
+    const $ = id => document.getElementById(id);
+
+    // ---- Socket 接続 ----
+    const socket = io({ auth: { token } });
+
+    socket.on('connect', () => {
+      socket.emit('joinCallRoom', { roomId, displayName: me.displayName || me.username });
+    });
+
+    socket.on('callRoomWaiting', () => {
+      $('status').textContent = '相手を待っています...';
+      $('avatar').classList.add('ringing');
+    });
+
+    socket.on('callRoomReady', ({ users }) => {
+      $('avatar').classList.remove('ringing');
+      const other = users.find(u => u.userId !== me.id);
+      if (other) {
+        $('contact-name').textContent = other.displayName;
+        $('avatar').textContent = other.displayName[0].toUpperCase();
+      }
+      $('status').textContent = '接続中...';
+      if (isInit) startWebRTC();
+    });
+
+    socket.on('callOffer', async ({ offer }) => {
+      try {
+        await initPC();
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit('callAnswer', { roomId, answer });
+      } catch (e) { showError('接続に失敗しました'); }
+    });
+
+    socket.on('callAnswer', async ({ answer }) => {
+      try { if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer)); }
+      catch {}
+    });
+
+    socket.on('callIceCandidate', async ({ candidate }) => {
+      try { if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate)); }
+      catch {}
+    });
+
+    socket.on('callHangup', () => endCall(false));
+
+    // ---- WebRTC ----
+    async function initPC() {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        $('local-audio').srcObject = localStream;
+      } catch {
+        showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してください。');
+        throw new Error('mic denied');
+      }
+
+      pc = new RTCPeerConnection(iceConfig);
+      localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+      pc.ontrack = e => {
+        $('remote-audio').srcObject = e.streams[0];
+        $('status').textContent = '通話中 00:00';
+        startTimer();
+      };
+
+      pc.onicecandidate = ({ candidate }) => {
+        if (candidate) socket.emit('callIceCandidate', { roomId, candidate });
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (!pc) return;
+        if (pc.connectionState === 'disconnected') $('status').textContent = '接続が切れました...';
+        if (pc.connectionState === 'failed') showError('接続に失敗しました。\nお互いのネット環境を確認してください。');
+      };
+    }
+
+    async function startWebRTC() {
+      try {
+        await initPC();
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('callOffer', { roomId, offer });
+      } catch (e) {
+        if (e.message !== 'mic denied') showError('通話の開始に失敗しました');
+      }
+    }
+
+    function startTimer() {
+      timerInterval = setInterval(() => {
+        timerSec++;
+        const m = String(Math.floor(timerSec / 60)).padStart(2, '0');
+        const s = String(timerSec % 60).padStart(2, '0');
+        $('status').textContent = `通話中 ${m}:${s}`;
+      }, 1000);
+    }
+
+    function toggleMute() {
+      if (!localStream) return;
+      isMuted = !isMuted;
+      localStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
+      $('mute-btn').textContent = isMuted ? '🔇' : '🎤';
+      $('mute-btn').classList.toggle('muted', isMuted);
+    }
+
+    function toggleSpeaker() {
+      const audio = $('remote-audio');
+      audio.muted = !audio.muted;
+      $('speaker-btn').textContent = audio.muted ? '🔈' : '🔊';
+      $('speaker-btn').classList.toggle('muted', audio.muted);
+    }
+
+    function endCall(notify = true) {
+      if (notify) socket.emit('callHangup', { roomId });
+      if (timerInterval) clearInterval(timerInterval);
+      if (localStream)   localStream.getTracks().forEach(t => t.stop());
+      if (pc)            { pc.close(); pc = null; }
+      $('status').textContent = '通話終了';
+      $('main').querySelector('.buttons').innerHTML =
+        '<button class="btn btn-end" style="background:#555" onclick="goBack()">← 戻る</button>';
+      setTimeout(goBack, 2000);
+    }
+
+    function showError(msg) {
+      $('main').style.display = 'none';
+      $('error-box').style.display = 'flex';
+      $('error-msg').textContent = msg;
+    }
+
+    function goBack() {
+      if (window.opener && !window.opener.closed) window.close();
+      else history.length > 1 ? history.back() : (location.href = '/');
+    }
+
+    window.addEventListener('beforeunload', () => { if (pc) endCall(true); });
+  </script>
+</body>
+</html>

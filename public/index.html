@@ -688,30 +688,32 @@
 
   let callTimeoutId = null;
 
+  function openCallPage(url) {
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) location.href = url;
+    else window.open(url, '_blank');
+  }
+
   function startCall(contact) {
     const roomId = generateRoomId();
-    const callUrl = `https://meet.jit.si/${roomId}`;
+    const callPageUrl = `/call?room=${roomId}`;
+    const fallbackUrl = `https://meet.jit.si/chatapp-${roomId}`;
     currentCallContact = contact;
-    currentJitsiUrl = callUrl;
+    currentJitsiUrl = callPageUrl;
 
-    // 相手に着信通知（socket + push）
-    socket.emit('callUser', { toUserId: contact.id, signal: { jitsiUrl: callUrl } });
+    // socket で着信通知 ＋ push通知（fallbackUrlはオフライン時のJitsi）
+    socket.emit('callUser', {
+      toUserId: contact.id,
+      signal: { jitsiUrl: callPageUrl, fallbackUrl }
+    });
 
-    // 発信中モーダルを表示（Jitsiはまだ開かない）
-    showCallModal(contact, '発信中...', [
-      { label: '✕ キャンセル', cls: 'end', fn: () => {
-        socket.emit('rejectCall', { toUserId: contact.id });
-        clearCallTimeout();
-        closeCallModal();
-      }}
-    ]);
+    // 発信者はすぐ通話ページへ
+    openCallPage(`/call?room=${roomId}&initiator=true`);
 
-    // 30秒で応答なしなら自動キャンセル
+    // 30秒で相手が応答しなければキャンセル
     callTimeoutId = setTimeout(() => {
       const tid = currentCallContact?.id;
       if (tid) socket.emit('rejectCall', { toUserId: tid });
       closeCallModal();
-      showToast('📵 応答がありません');
     }, 30000);
   }
 
@@ -724,13 +726,9 @@
     currentCallContact = caller;
     pendingJitsiUrl = signal?.jitsiUrl;
 
-    // 着信音を鳴らす
     ringtone = createRingtone();
-
-    // バイブレーション（Android対応）
     if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
 
-    // 着信モーダル（アバターにリングアニメ付き）
     showCallModal(caller, '着信中...', [
       { label: '✓ 応答', cls: 'accept', fn: acceptIncomingCall },
       { label: '✕ 拒否', cls: 'reject', fn: rejectIncomingCall }
@@ -742,9 +740,10 @@
     if (ringtone) { ringtone.stop(); ringtone = null; }
     if (navigator.vibrate) navigator.vibrate(0);
     socket.emit('answerCall', { toUserId: currentCallContact?.id, signal: {} });
-    closeCallModal();
-    if (pendingJitsiUrl) window.open(pendingJitsiUrl, '_blank');
+    const url = pendingJitsiUrl;
     pendingJitsiUrl = null;
+    closeCallModal();
+    if (url) openCallPage(url);
   }
 
   function rejectIncomingCall() {
@@ -757,8 +756,6 @@
   function onCallAccepted({ signal }) {
     clearCallTimeout();
     closeCallModal();
-    if (currentJitsiUrl) window.open(currentJitsiUrl, '_blank');
-    currentJitsiUrl = null;
   }
 
   function showToast(msg) {

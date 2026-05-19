@@ -1,10 +1,10 @@
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
 const { Message } = require('./models');
 const { sendPushNotification } = require('./push');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'chat-app-secret-key-change-in-production';
 const onlineUsers = new Map();
+const callRooms = new Map(); // roomId -> [{ userId, socketId, displayName }]
 
 function setupSocket(io) {
   io.use((socket, next) => {
@@ -46,7 +46,6 @@ function setupSocket(io) {
       if (toSocketId) {
         io.to(toSocketId).emit('newMessage', out);
       } else {
-        // 相手がオフラインならプッシュ通知を送る
         const notifText = out.file ? '📎 ファイルが届きました' : out.text;
         sendPushNotification(toUserId, {
           title: socket.username,
@@ -62,18 +61,22 @@ function setupSocket(io) {
       await Message.updateMany({ fromId: fromUserId, toId: socket.userId }, { read: true });
     });
 
+    // ========== チャット画面の通話シグナリング ==========
     socket.on('callUser', ({ toUserId, signal }) => {
       const toSocketId = onlineUsers.get(toUserId);
-      if (toSocketId) io.to(toSocketId).emit('incomingCall', { fromId: socket.userId, fromName: socket.username, signal });
-      else socket.emit('callFailed', { reason: '相手はオフラインです' });
-
-      // バックグラウンドでも着信通知が届くようにプッシュ通知を送る
+      if (toSocketId) {
+        io.to(toSocketId).emit('incomingCall', { fromId: socket.userId, fromName: socket.username, signal });
+      } else {
+        socket.emit('callFailed', { reason: '相手はオフラインです' });
+      }
+      // オフライン時もプッシュ通知（fallbackUrlがあればそちらを使う）
+      const pushUrl = signal?.fallbackUrl || signal?.jitsiUrl;
       sendPushNotification(toUserId, {
         title: `📞 ${socket.username} から着信`,
         body: 'タップして通話に参加してください',
         icon: '/icon.svg',
         badge: '/icon.svg',
-        data: { type: 'call', fromId: socket.userId, jitsiUrl: signal?.jitsiUrl }
+        data: { type: 'call', fromId: socket.userId, jitsiUrl: pushUrl }
       });
     });
 
@@ -87,17 +90,50 @@ function setupSocket(io) {
       if (s) io.to(s).emit('callRejected');
     });
 
-    socket.on('endCall', ({ toUserId }) => {
-      const s = onlineUsers.get(toUserId);
-      if (s) io.to(s).emit('callEnded');
+    // ========== /call ページの WebRTC シグナリング ==========
+    socket.on('joinCallRoom', ({ roomId, displayName }) => {
+      socket.join('call-' + roomId);
+      socket.currentCallRoom = roomId;
+
+      if (!callRooms.has(roomId)) callRooms.set(roomId, []);
+      const room = callRooms.get(roomId);
+
+      if (!room.find(u => u.userId === socket.userId)) {
+        room.push({ userId: socket.userId, socketId: socket.id, displayName: displayName || socket.username });
+      }
+
+      if (room.length >= 2) {
+        io.to('call-' + roomId).emit('callRoomReady', {
+          users: room.map(u => ({ userId: u.userId, displayName: u.displayName }))
+        });
+      } else {
+        socket.emit('callRoomWaiting');
+      }
     });
 
-    socket.on('iceCandidate', ({ toUserId, candidate }) => {
-      const s = onlineUsers.get(toUserId);
-      if (s) io.to(s).emit('iceCandidate', { candidate });
+    socket.on('callOffer', ({ roomId, offer }) => {
+      socket.to('call-' + roomId).emit('callOffer', { offer });
+    });
+
+    socket.on('callAnswer', ({ roomId, answer }) => {
+      socket.to('call-' + roomId).emit('callAnswer', { answer });
+    });
+
+    socket.on('callIceCandidate', ({ roomId, candidate }) => {
+      socket.to('call-' + roomId).emit('callIceCandidate', { candidate });
+    });
+
+    socket.on('callHangup', ({ roomId }) => {
+      socket.to('call-' + roomId).emit('callHangup');
+      callRooms.delete(roomId);
     });
 
     socket.on('disconnect', () => {
+      // 通話中なら相手に通知
+      if (socket.currentCallRoom) {
+        socket.to('call-' + socket.currentCallRoom).emit('callHangup');
+        callRooms.delete(socket.currentCallRoom);
+      }
       onlineUsers.delete(socket.userId);
       io.emit('userOffline', { userId: socket.userId });
     });
