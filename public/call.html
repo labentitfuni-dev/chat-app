@@ -30,67 +30,86 @@
     }
 
     #contact-name { font-size: 26px; font-weight: bold; margin-bottom: 10px; }
-    #status { font-size: 16px; color: #aaa; margin-bottom: 60px; min-height: 22px; }
+    #status { font-size: 15px; color: #aaa; margin-bottom: 64px; min-height: 22px; text-align: center; }
 
-    .buttons { display: flex; gap: 36px; align-items: center; }
+    /* ボタン群 */
+    .buttons { display: flex; gap: 28px; align-items: flex-end; }
+    .btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .btn-label { font-size: 12px; color: #aaa; }
     .btn {
-      width: 72px; height: 72px; border-radius: 50%; border: none;
-      font-size: 30px; cursor: pointer; display: flex; align-items: center;
-      justify-content: center; transition: transform 0.1s, background 0.2s;
+      border-radius: 50%; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.1s, background 0.2s;
     }
     .btn:active { transform: scale(0.88); }
-    .btn-mute  { background: #2a2a3e; color: white; }
-    .btn-mute.muted { background: #555; }
-    .btn-speaker { background: #2a2a3e; color: white; }
-    .btn-end   { background: #e53935; color: white; width: 80px; height: 80px; font-size: 34px; }
+    .btn-mute    { width: 64px; height: 64px; font-size: 26px; background: #2a2a3e; color: white; }
+    .btn-mute.active { background: #e53935; }
+    .btn-end     { width: 76px; height: 76px; font-size: 32px; background: #e53935; color: white; }
+    .btn-speaker { width: 64px; height: 64px; font-size: 26px; background: #2a2a3e; color: white; }
+    .btn-speaker.active { background: #06C755; }
+
+    /* 音声有効化バナー */
+    #audio-banner {
+      display: none; position: fixed; bottom: 160px;
+      background: rgba(255,200,0,0.15); border: 1px solid rgba(255,200,0,0.4);
+      border-radius: 12px; padding: 12px 20px; font-size: 14px; color: #ffe082;
+      text-align: center; cursor: pointer;
+    }
 
     #error-box {
-      display: none; flex-direction: column; align-items: center; gap: 20px; padding: 32px;
-      text-align: center;
+      display: none; flex-direction: column; align-items: center; gap: 20px; padding: 32px; text-align: center;
     }
-    #error-box p { color: #e57373; font-size: 17px; line-height: 1.5; }
-    #back-btn-err {
-      background: #06C755; color: white; border: none; border-radius: 24px;
-      padding: 12px 28px; font-size: 15px; font-weight: bold; cursor: pointer;
-    }
+    #error-box p { color: #e57373; font-size: 17px; line-height: 1.6; white-space: pre-line; }
+    .btn-back { background: #06C755; color: white; border: none; border-radius: 24px; padding: 12px 28px; font-size: 15px; font-weight: bold; cursor: pointer; }
 
     audio { display: none; }
   </style>
 </head>
 <body>
   <audio id="remote-audio" autoplay playsinline></audio>
-  <audio id="local-audio"  autoplay muted    playsinline></audio>
+  <audio id="local-audio"  autoplay muted playsinline></audio>
 
   <div id="main">
     <div class="avatar" id="avatar">?</div>
     <div id="contact-name">接続中...</div>
     <div id="status">相手を待っています...</div>
     <div class="buttons">
-      <button class="btn btn-mute"    id="mute-btn"    onclick="toggleMute()">🎤</button>
-      <button class="btn btn-end"                      onclick="endCall(true)">📵</button>
-      <button class="btn btn-speaker" id="speaker-btn" onclick="toggleSpeaker()">🔊</button>
+      <div class="btn-wrap">
+        <button class="btn btn-mute" id="mute-btn" onclick="toggleMute()">🎤</button>
+        <span class="btn-label">ミュート</span>
+      </div>
+      <div class="btn-wrap">
+        <button class="btn btn-end" onclick="endCall(true)">📵</button>
+        <span class="btn-label">終了</span>
+      </div>
+      <div class="btn-wrap">
+        <button class="btn btn-speaker" id="speaker-btn" onclick="enableAudio()">🔊</button>
+        <span class="btn-label">音声ON</span>
+      </div>
     </div>
+  </div>
+
+  <div id="audio-banner" onclick="enableAudio()">
+    🔊 タップして音声を有効にする
   </div>
 
   <div id="error-box">
     <p id="error-msg">エラーが発生しました</p>
-    <button class="btn" id="back-btn-err" onclick="goBack()">← 戻る</button>
+    <button class="btn-back" onclick="goBack()">← 戻る</button>
   </div>
 
   <script>
-    const params   = new URLSearchParams(location.search);
-    const roomId   = params.get('room');
-    const isInit   = params.get('initiator') === 'true';
-    const token    = localStorage.getItem('token');
-    const me       = JSON.parse(localStorage.getItem('user') || '{}');
+    const params = new URLSearchParams(location.search);
+    const roomId = params.get('room');
+    const isInit = params.get('initiator') === 'true';
+    const token  = localStorage.getItem('token');
+    const me     = JSON.parse(localStorage.getItem('user') || '{}');
 
     if (!roomId || !token) { location.href = '/'; }
 
-    // ICE サーバー（STUN + TURN: モバイル4G/5G対応）
     const iceConfig = { iceServers: [
       { urls: 'stun:stun.l.google.com:19302'  },
       { urls: 'stun:stun1.l.google.com:19302' },
-      // 無料TURNサーバー（NATを越えるのに必要）
       {
         urls: [
           'turn:openrelay.metered.ca:80',
@@ -103,11 +122,21 @@
     ]};
 
     let pc = null, localStream = null;
-    let isMuted = false, timerSec = 0, timerInterval = null;
+    let isMuted = false, isSpeakerOn = true;
+    let timerSec = 0, timerInterval = null;
+    let timerStarted = false;
 
     const $ = id => document.getElementById(id);
 
-    // ---- Socket 接続 ----
+    // iOS/Android で AudioContext をアンロック（ページ読み込み直後のタッチで解除）
+    function unlockAudio() {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      ctx.resume().then(() => ctx.close());
+    }
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click',      unlockAudio, { once: true });
+
+    // ---- Socket ----
     const socket = io({ auth: { token } });
 
     socket.on('connect', () => {
@@ -141,13 +170,11 @@
     });
 
     socket.on('callAnswer', async ({ answer }) => {
-      try { if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer)); }
-      catch {}
+      try { if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer)); } catch {}
     });
 
     socket.on('callIceCandidate', async ({ candidate }) => {
-      try { if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate)); }
-      catch {}
+      try { if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
     });
 
     socket.on('callHangup', () => endCall(false));
@@ -158,7 +185,7 @@
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         $('local-audio').srcObject = localStream;
       } catch {
-        showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してください。');
+        showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してから\nもう一度お試しください。');
         throw new Error('mic denied');
       }
 
@@ -168,18 +195,7 @@
       pc.ontrack = e => {
         const audio = $('remote-audio');
         audio.srcObject = e.streams[0];
-        // モバイルでautoplayがブロックされる場合に強制再生
-        audio.play().catch(() => {
-          $('status').textContent = '▶ タップして音声を有効化';
-          document.body.addEventListener('click', () => {
-            audio.play();
-            $('status').textContent = '通話中 00:00';
-            startTimer();
-          }, { once: true });
-          return;
-        });
-        $('status').textContent = '通話中 00:00';
-        startTimer();
+        tryPlayAudio(audio);
       };
 
       pc.onicecandidate = ({ candidate }) => {
@@ -188,9 +204,39 @@
 
       pc.onconnectionstatechange = () => {
         if (!pc) return;
+        if (pc.connectionState === 'connected')    onCallConnected();
         if (pc.connectionState === 'disconnected') $('status').textContent = '接続が切れました...';
-        if (pc.connectionState === 'failed') showError('接続に失敗しました。\nお互いのネット環境を確認してください。');
+        if (pc.connectionState === 'failed')       showError('接続に失敗しました。\nお互いのネット環境を確認してください。');
       };
+    }
+
+    function tryPlayAudio(audio) {
+      audio.play().then(() => {
+        $('audio-banner').style.display = 'none';
+      }).catch(() => {
+        // autoplay blocked → バナーを表示してタップを促す
+        $('audio-banner').style.display = 'block';
+      });
+    }
+
+    function enableAudio() {
+      const audio = $('remote-audio');
+      audio.play().then(() => {
+        $('audio-banner').style.display = 'none';
+        $('speaker-btn').classList.add('active');
+      }).catch(() => {});
+    }
+
+    function onCallConnected() {
+      if (timerStarted) return;
+      timerStarted = true;
+      $('status').textContent = '通話中 00:00';
+      timerInterval = setInterval(() => {
+        timerSec++;
+        const m = String(Math.floor(timerSec / 60)).padStart(2, '0');
+        const s = String(timerSec % 60).padStart(2, '0');
+        $('status').textContent = `通話中 ${m}:${s}`;
+      }, 1000);
     }
 
     async function startWebRTC() {
@@ -204,28 +250,12 @@
       }
     }
 
-    function startTimer() {
-      timerInterval = setInterval(() => {
-        timerSec++;
-        const m = String(Math.floor(timerSec / 60)).padStart(2, '0');
-        const s = String(timerSec % 60).padStart(2, '0');
-        $('status').textContent = `通話中 ${m}:${s}`;
-      }, 1000);
-    }
-
     function toggleMute() {
       if (!localStream) return;
       isMuted = !isMuted;
       localStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
       $('mute-btn').textContent = isMuted ? '🔇' : '🎤';
-      $('mute-btn').classList.toggle('muted', isMuted);
-    }
-
-    function toggleSpeaker() {
-      const audio = $('remote-audio');
-      audio.muted = !audio.muted;
-      $('speaker-btn').textContent = audio.muted ? '🔈' : '🔊';
-      $('speaker-btn').classList.toggle('muted', audio.muted);
+      $('mute-btn').classList.toggle('active', isMuted);
     }
 
     function endCall(notify = true) {
@@ -235,7 +265,7 @@
       if (pc)            { pc.close(); pc = null; }
       $('status').textContent = '通話終了';
       $('main').querySelector('.buttons').innerHTML =
-        '<button class="btn btn-end" style="background:#555" onclick="goBack()">← 戻る</button>';
+        '<div class="btn-wrap"><button class="btn btn-back" onclick="goBack()">← 戻る</button></div>';
       setTimeout(goBack, 2000);
     }
 
