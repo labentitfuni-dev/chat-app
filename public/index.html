@@ -204,7 +204,6 @@
     <div id="sidebar-header">
       <h2>💬 トーク</h2>
       <div id="header-btns">
-        <button id="notif-btn" title="通知を有効にする" onclick="requestNotifPermission()" style="display:none">🔔</button>
         <button id="install-btn" title="ホーム画面に追加">📲 追加</button>
         <button id="add-friend-btn" title="友達追加">＋</button>
         <button id="logout-btn">ログアウト</button>
@@ -875,7 +874,7 @@
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify(sub)
     });
-    $('notif-btn').style.display = 'none';
+
   }
 
   async function registerPush() {
@@ -890,7 +889,7 @@
         await subscribePush(reg);
       } else if (perm === 'default') {
         // 未決定 → バナーとボタンを表示
-        $('notif-btn').style.display = 'inline-flex';
+
         if (!localStorage.getItem('notif-banner-dismissed')) {
           $('notif-banner').style.display = 'flex';
         }
@@ -911,7 +910,7 @@
       const reg = await navigator.serviceWorker.ready;
       await subscribePush(reg);
       $('notif-banner').style.display = 'none';
-      $('notif-btn').style.display = 'none';
+
       showToast('通知を有効にしました');
     } else {
       $('notif-banner').style.display = 'none';
