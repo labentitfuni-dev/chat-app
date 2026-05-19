@@ -452,20 +452,29 @@
   }
 
   // ========== アバター ==========
+  function avatarInitial(name, size) {
+    const letter = (name || '?')[0].toUpperCase();
+    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#06C755;display:flex;align-items:center;justify-content:center;color:white;font-size:${Math.floor(size*0.4)}px;font-weight:bold;">${letter}</div>`;
+  }
+
   function avatarHtml(user, size = 44) {
     const name = user.displayName || user.username || '?';
     if (user.avatar) {
-      return `<img src="${user.avatar}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;">`;
+      return `<img src="${user.avatar}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML='${avatarInitial(name, size).replace(/'/g, "\\'")}'">`;
     }
-    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#06C755;display:flex;align-items:center;justify-content:center;color:white;font-size:${Math.floor(size*0.4)}px;font-weight:bold;">${name[0].toUpperCase()}</div>`;
+    return avatarInitial(name, size);
   }
 
   function renderMyAvatar() {
     const el = $('my-avatar');
-    el.innerHTML = me.avatar
-      ? `<img src="${me.avatar}" style="width:48px;height:48px;object-fit:cover;">`
-      : (me.displayName || me.username || '?')[0].toUpperCase();
-    el.style.background = me.avatar ? 'transparent' : '#06C755';
+    const name = (me.displayName || me.username || '?')[0].toUpperCase();
+    if (me.avatar) {
+      el.innerHTML = `<img src="${me.avatar}" style="width:48px;height:48px;object-fit:cover;" onerror="this.parentElement.innerHTML='${name}';this.parentElement.style.background='#06C755'">`;
+      el.style.background = 'transparent';
+    } else {
+      el.innerHTML = name;
+      el.style.background = '#06C755';
+    }
   }
 
   $('my-avatar-wrap').onclick = () => $('avatar-input').click();
@@ -570,7 +579,7 @@
       div.className = 'contact-item' + (currentContact?.id === u.id ? ' active' : '');
       div.innerHTML = `
         <div class="avatar" style="position:relative;background:${u.avatar?'transparent':'#06C755'}">
-          ${u.avatar ? `<img src="${u.avatar}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;">` : (u.displayName||u.username)[0].toUpperCase()}
+          ${u.avatar ? `<img src="${u.avatar}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.style.background='#06C755';this.parentElement.insertAdjacentText('afterbegin','${(u.displayName||u.username||'?')[0].toUpperCase()}')">` : (u.displayName||u.username||'?')[0].toUpperCase()}
           ${online ? '<div class="online-dot"></div>' : ''}
         </div>
         <div class="contact-info">
