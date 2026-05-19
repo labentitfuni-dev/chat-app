@@ -13,10 +13,15 @@ const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } 
 app.use(cors());
 app.use(express.json());
 
-// index.html は常に最新版を返す（スマホのキャッシュ対策）
+// index.html / call.html は常に最新版を返す（スマホのキャッシュ対策）
 app.get('/', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
+app.get('/call', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '..', 'public', 'call.html'));
 });
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
