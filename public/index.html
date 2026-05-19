@@ -382,29 +382,41 @@
   $('avatar-input').onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
     try {
       $('my-avatar-edit').textContent = '…';
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + token },
-        body: formData
-      });
-      const data = await res.json();
-      const avatarUrl = data.url;
+      // 画像をcanvasで圧縮してbase64に変換（サーバー再起動でも消えない）
+      const base64 = await resizeAndEncodeImage(file, 256);
       await fetch('/api/auth/avatar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ avatar: avatarUrl })
+        body: JSON.stringify({ avatar: base64 })
       });
-      me.avatar = avatarUrl;
+      me.avatar = base64;
       localStorage.setItem('user', JSON.stringify(me));
       renderMyAvatar();
       showToast('アイコンを変更しました');
     } catch { showToast('変更に失敗しました'); }
     finally { $('my-avatar-edit').textContent = '✏'; $('avatar-input').value = ''; }
   };
+
+  function resizeAndEncodeImage(file, maxSize) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
 
   $('logout-btn').onclick = () => { localStorage.removeItem('token'); localStorage.removeItem('user'); location.reload(); };
 
