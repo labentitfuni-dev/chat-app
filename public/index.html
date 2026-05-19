@@ -38,6 +38,12 @@
     #header-btns { display: flex; gap: 8px; align-items: center; }
     #add-friend-btn { background: rgba(255,255,255,0.25); border: none; color: white; cursor: pointer; font-size: 20px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
     #logout-btn { background: none; border: none; color: white; cursor: pointer; font-size: 13px; }
+    #install-btn { background: rgba(255,255,255,0.25); border: none; color: white; cursor: pointer; font-size: 12px; font-weight: bold; padding: 4px 10px; border-radius: 12px; display: none; }
+
+    /* iOSインストール案内バナー */
+    #ios-install-banner { display: none; background: #fff; border-bottom: 1px solid #d0ecd8; padding: 10px 14px; font-size: 13px; color: #333; align-items: center; gap:10px; }
+    #ios-install-banner span { flex: 1; line-height: 1.5; }
+    #ios-banner-close { background: none; border: none; font-size: 18px; color: #aaa; cursor: pointer; flex-shrink: 0; }
 
     /* 自分のID表示 */
     #my-info { padding: 10px 16px; background: #f0faf4; border-bottom: 1px solid #e0f0e8; }
@@ -188,9 +194,14 @@
     <div id="sidebar-header">
       <h2>💬 トーク</h2>
       <div id="header-btns">
+        <button id="install-btn" title="ホーム画面に追加">📲 追加</button>
         <button id="add-friend-btn" title="友達追加">＋</button>
         <button id="logout-btn">ログアウト</button>
       </div>
+    </div>
+    <div id="ios-install-banner">
+      <span>📲 ホーム画面に追加できます！<br>Safariの <strong>共有ボタン</strong> →「<strong>ホーム画面に追加</strong>」をタップ</span>
+      <button id="ios-banner-close">✕</button>
     </div>
     <div id="my-info">
       <div id="my-info-name"></div>
@@ -323,6 +334,7 @@
     connectSocket();
     fetchFriends();
     registerPush();
+    showIosBannerIfNeeded();
   }
 
   $('logout-btn').onclick = () => { localStorage.removeItem('token'); localStorage.removeItem('user'); location.reload(); };
@@ -827,6 +839,51 @@
   }
 
   autoLogin();
+
+  // ========== ホーム画面に追加（PWAインストール） ==========
+  let deferredInstallPrompt = null;
+
+  // Android / Chrome: インストールイベントをキャプチャ
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    $('install-btn').style.display = 'block';
+  });
+
+  // インストール済みになったらボタンを隠す
+  window.addEventListener('appinstalled', () => {
+    $('install-btn').style.display = 'none';
+    deferredInstallPrompt = null;
+    showToast('✅ ホーム画面に追加しました！');
+  });
+
+  $('install-btn').onclick = async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') deferredInstallPrompt = null;
+    }
+  };
+
+  // iOS Safari: beforeinstallprompt が発火しないので案内バナーを表示
+  function isIosSafari() {
+    const ua = navigator.userAgent;
+    return /iP(hone|ad|od)/.test(ua) && /WebKit/.test(ua) && !/CriOS|FxiOS|OPiOS/.test(ua);
+  }
+  function isInStandaloneMode() {
+    return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  }
+
+  function showIosBannerIfNeeded() {
+    if (isIosSafari() && !isInStandaloneMode() && !localStorage.getItem('ios-banner-dismissed')) {
+      $('ios-install-banner').style.display = 'flex';
+    }
+  }
+
+  $('ios-banner-close').onclick = () => {
+    $('ios-install-banner').style.display = 'none';
+    localStorage.setItem('ios-banner-dismissed', '1');
+  };
 </script>
 </body>
 </html>
