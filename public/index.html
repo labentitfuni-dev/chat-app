@@ -46,10 +46,16 @@
     #ios-banner-close { background: none; border: none; font-size: 18px; color: #aaa; cursor: pointer; flex-shrink: 0; }
 
     /* 自分のID表示 */
-    #my-info { padding: 10px 16px; background: #f0faf4; border-bottom: 1px solid #e0f0e8; }
+    #my-info { padding: 10px 16px; background: #f0faf4; border-bottom: 1px solid #e0f0e8; display: flex; align-items: center; gap: 12px; }
+    #my-avatar-wrap { position: relative; flex-shrink: 0; cursor: pointer; }
+    #my-avatar { width: 48px; height: 48px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold; overflow: hidden; }
+    #my-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    #my-avatar-edit { position: absolute; bottom: 0; right: 0; background: #06C755; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 2px solid white; }
+    #my-info-text { flex: 1; min-width: 0; }
     #my-info-name { font-size: 13px; color: #444; font-weight: 600; }
     #my-info-code { font-size: 12px; color: #06C755; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
     #copy-code-btn { font-size: 11px; background: #06C755; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
     #contacts-list { flex: 1; overflow-y: auto; }
     .contact-item { padding: 14px 16px; cursor: pointer; display: flex; align-items: center; border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
@@ -204,11 +210,18 @@
       <button id="ios-banner-close">✕</button>
     </div>
     <div id="my-info">
-      <div id="my-info-name"></div>
-      <div style="font-size:12px;color:#888;margin-top:2px">ログインID: <span id="my-username"></span></div>
-      <div id="my-info-code">
-        <span>友達ID: <strong id="my-code"></strong></span>
-        <button id="copy-code-btn">コピー</button>
+      <input type="file" id="avatar-input" accept="image/*" style="display:none">
+      <div id="my-avatar-wrap" title="アイコンを変更">
+        <div id="my-avatar"></div>
+        <div id="my-avatar-edit">✏</div>
+      </div>
+      <div id="my-info-text">
+        <div id="my-info-name"></div>
+        <div style="font-size:12px;color:#888;margin-top:2px">ログインID: <span id="my-username"></span></div>
+        <div id="my-info-code">
+          <span>友達ID: <strong id="my-code"></strong></span>
+          <button id="copy-code-btn">コピー</button>
+        </div>
       </div>
     </div>
     <div id="contacts-list"></div>
@@ -331,11 +344,58 @@
     $('my-info-name').textContent = me.displayName || me.username;
     $('my-username').textContent = me.username;
     $('my-code').textContent = me.friendCode;
+    renderMyAvatar();
     connectSocket();
     fetchFriends();
     registerPush();
     showIosBannerIfNeeded();
   }
+
+  // ========== アバター ==========
+  function avatarHtml(user, size = 44) {
+    const name = user.displayName || user.username || '?';
+    if (user.avatar) {
+      return `<img src="${user.avatar}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;">`;
+    }
+    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#06C755;display:flex;align-items:center;justify-content:center;color:white;font-size:${Math.floor(size*0.4)}px;font-weight:bold;">${name[0].toUpperCase()}</div>`;
+  }
+
+  function renderMyAvatar() {
+    const el = $('my-avatar');
+    el.innerHTML = me.avatar
+      ? `<img src="${me.avatar}" style="width:48px;height:48px;object-fit:cover;">`
+      : (me.displayName || me.username || '?')[0].toUpperCase();
+    el.style.background = me.avatar ? 'transparent' : '#06C755';
+  }
+
+  $('my-avatar-wrap').onclick = () => $('avatar-input').click();
+
+  $('avatar-input').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      $('my-avatar-edit').textContent = '…';
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: formData
+      });
+      const data = await res.json();
+      const avatarUrl = data.url;
+      await fetch('/api/auth/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ avatar: avatarUrl })
+      });
+      me.avatar = avatarUrl;
+      localStorage.setItem('user', JSON.stringify(me));
+      renderMyAvatar();
+      showToast('アイコンを変更しました');
+    } catch { showToast('変更に失敗しました'); }
+    finally { $('my-avatar-edit').textContent = '✏'; $('avatar-input').value = ''; }
+  };
 
   $('logout-btn').onclick = () => { localStorage.removeItem('token'); localStorage.removeItem('user'); location.reload(); };
 
@@ -403,7 +463,10 @@
       const div = document.createElement('div');
       div.className = 'contact-item' + (currentContact?.id === u.id ? ' active' : '');
       div.innerHTML = `
-        <div class="avatar">${(u.displayName||u.username)[0].toUpperCase()}${online ? '<div class="online-dot"></div>' : ''}</div>
+        <div class="avatar" style="position:relative;background:${u.avatar?'transparent':'#06C755'}">
+          ${u.avatar ? `<img src="${u.avatar}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;">` : (u.displayName||u.username)[0].toUpperCase()}
+          ${online ? '<div class="online-dot"></div>' : ''}
+        </div>
         <div class="contact-info">
           <div class="contact-name">${u.displayName || u.username}</div>
           <div class="contact-status ${online?'online':''}">${online ? 'オンライン' : 'オフライン'}</div>

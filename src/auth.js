@@ -13,7 +13,7 @@ function verifyToken(req) {
 }
 
 function safeUser(u) {
-  return { id: u._id.toString(), username: u.username, displayName: u.displayName, friendCode: u.friendCode, friends: u.friends || [] };
+  return { id: u._id.toString(), username: u.username, displayName: u.displayName, friendCode: u.friendCode, friends: u.friends || [], avatar: u.avatar || '' };
 }
 
 async function generateFriendCode() {
@@ -109,7 +109,16 @@ router.get('/friends', async (req, res) => {
     const me = await User.findById(id);
     if (!me) return res.status(404).json({ error: 'ユーザーが見つかりません' });
     const friendList = await User.find({ _id: { $in: me.friends } });
-    res.json(friendList.map(u => ({ id: u._id.toString(), username: u.username, displayName: u.displayName, friendCode: u.friendCode })));
+    res.json(friendList.map(u => ({ id: u._id.toString(), username: u.username, displayName: u.displayName, friendCode: u.friendCode, avatar: u.avatar || '' })));
+  } catch { res.status(401).json({ error: 'トークンが無効です' }); }
+});
+
+router.post('/avatar', async (req, res) => {
+  try {
+    const { id } = verifyToken(req);
+    const { avatar } = req.body;
+    await User.findByIdAndUpdate(id, { avatar });
+    res.json({ success: true, avatar });
   } catch { res.status(401).json({ error: 'トークンが無効です' }); }
 });
 
