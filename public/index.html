@@ -412,9 +412,22 @@
     if (code.length !== 6) { $('modal-error').textContent = '6桁のIDを入力してください'; return; }
     $('modal-error').textContent = '';
     try {
-      const res = await fetch(`/api/auth/search/${code}`, { headers: { Authorization: 'Bearer ' + token } });
+      const res = await fetch(`/api/auth/search/${code}`, { headers: { 'Authorization': 'Bearer ' + token } });
       const data = await res.json();
-      if (!res.ok) { $('modal-error').textContent = data.error; $('search-result').style.display = 'none'; return; }
+      if (!res.ok) {
+        if (data.error === 'TOKEN_INVALID' || res.status === 401) {
+          // トークン無効 → 自動ログアウト
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          $('add-friend-modal').style.display = 'none';
+          alert('ログインの有効期限が切れました。再度ログインしてください。');
+          location.reload();
+          return;
+        }
+        $('modal-error').textContent = data.error;
+        $('search-result').style.display = 'none';
+        return;
+      }
       searchedUser = data;
       $('result-avatar').textContent = (data.displayName||data.username)[0].toUpperCase();
       $('result-name').textContent = data.displayName || data.username;

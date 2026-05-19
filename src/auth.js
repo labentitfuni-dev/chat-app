@@ -67,10 +67,16 @@ router.get('/me', async (req, res) => {
 router.get('/search/:friendCode', async (req, res) => {
   try {
     verifyToken(req);
+  } catch {
+    return res.status(401).json({ error: 'TOKEN_INVALID' });
+  }
+  try {
     const user = await User.findOne({ friendCode: req.params.friendCode });
     if (!user) return res.status(404).json({ error: 'そのIDのユーザーは見つかりません' });
     res.json({ id: user._id.toString(), username: user.username, displayName: user.displayName, friendCode: user.friendCode });
-  } catch { res.status(401).json({ error: 'トークンが無効です' }); }
+  } catch (e) {
+    res.status(500).json({ error: 'サーバーエラー: ' + e.message });
+  }
 });
 
 router.post('/add-friend', async (req, res) => {
