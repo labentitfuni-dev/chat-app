@@ -31,6 +31,22 @@ app.use('/api/upload', require('./upload'));
 app.use('/api/push', require('./push').router);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+app.get('/api/ice-servers', async (req, res) => {
+  try {
+    const url = `https://${process.env.METERED_DOMAIN}/api/v1/turn/credentials?apiKey=${process.env.METERED_API_KEY}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Metered API error');
+    const iceServers = await response.json();
+    res.json(iceServers);
+  } catch (e) {
+    // フォールバック: Googleの公開STUNサーバー
+    res.json([
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]);
+  }
+});
+
 const { setupSocket } = require('./socketHandler');
 setupSocket(io);
 

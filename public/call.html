@@ -137,24 +137,17 @@
 
     if (!roomId || !token) { location.href = '/'; }
 
-    const iceConfig = { iceServers: [
-      { urls: 'stun:stun.l.google.com:19302'  },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun.cloudflare.com:3478' },
-      // 無料TURN（複数フォールバック）
-      {
-        urls: ['turn:freestun.net:3478', 'turn:freestun.net:3479'],
-        username: 'free', credential: 'free'
-      },
-      {
-        urls: [
-          'turn:openrelay.metered.ca:80',
-          'turn:openrelay.metered.ca:443',
-          'turn:openrelay.metered.ca:443?transport=tcp'
-        ],
-        username: 'openrelayproject', credential: 'openrelayproject'
-      }
-    ]};
+    let iceConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+    async function loadIceServers() {
+      try {
+        const res = await fetch('/api/ice-servers');
+        const servers = await res.json();
+        if (Array.isArray(servers) && servers.length > 0) {
+          iceConfig = { iceServers: servers };
+        }
+      } catch {}
+    }
 
     let pc = null, localStream = null;
     let isMuted = false, isSpeakerOn = true;
@@ -196,6 +189,7 @@
 
     socket.on('callOffer', async ({ offer }) => {
       try {
+        await loadIceServers();
         await initPC();
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
         const answer = await pc.createAnswer();
@@ -281,6 +275,7 @@
 
     async function startWebRTC() {
       try {
+        await loadIceServers();
         await initPC();
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
