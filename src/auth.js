@@ -113,6 +113,15 @@ router.get('/friends', async (req, res) => {
   } catch { res.status(401).json({ error: 'トークンが無効です' }); }
 });
 
+router.post('/notif-setting', async (req, res) => {
+  try {
+    const { id } = verifyToken(req);
+    const { hideNotifContent } = req.body;
+    await User.findByIdAndUpdate(id, { hideNotifContent });
+    res.json({ success: true });
+  } catch { res.status(401).json({ error: 'トークンが無効です' }); }
+});
+
 router.post('/avatar', async (req, res) => {
   try {
     const { id } = verifyToken(req);

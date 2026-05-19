@@ -240,12 +240,12 @@
         <div class="tab-header-btns">
           <button id="install-btn" title="ホーム画面に追加">📲 追加</button>
           <button class="tab-icon-btn" id="settings-btn" title="設定">
-            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
           </button>
           <button class="tab-icon-btn" id="add-friend-btn" title="友達追加">
-            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
           </button>
@@ -341,6 +341,16 @@
       </div>
       <label class="toggle-wrap">
         <input type="checkbox" id="notif-toggle" onchange="onNotifToggle(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="settings-row">
+      <div>
+        <div class="settings-row-label">内容を非表示</div>
+        <div class="settings-row-sub">通知に「新しいメッセージ」とだけ表示</div>
+      </div>
+      <label class="toggle-wrap">
+        <input type="checkbox" id="hide-content-toggle" onchange="onHideContentToggle(this.checked)">
         <span class="toggle-slider"></span>
       </label>
     </div>
@@ -619,6 +629,7 @@
   function openSettings() {
     $('settings-panel').style.display = 'block';
     updateNotifToggle();
+    $('hide-content-toggle').checked = !!me.hideNotifContent;
   }
   function closeSettings() { $('settings-panel').style.display = 'none'; }
 
@@ -650,6 +661,17 @@
       showToast('通知をオフにしました');
     }
     updateNotifToggle();
+  }
+
+  async function onHideContentToggle(checked) {
+    await fetch('/api/auth/notif-setting', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ hideNotifContent: checked })
+    });
+    me.hideNotifContent = checked;
+    localStorage.setItem('user', JSON.stringify(me));
+    showToast(checked ? '通知の内容を非表示にしました' : '通知の内容を表示するようにしました');
   }
 
   function doLogout() {
@@ -1157,47 +1179,29 @@
       return;
     }
 
-    // ローディング画面を表示
-    $('loading-screen').style.display = 'flex';
-    $('loading-msg').textContent = '接続中...';
-
-    // サーバーが起動するまで最大30秒リトライ
-    for (let i = 0; i < 10; i++) {
-      try {
-        const res = await fetch('/api/health', { signal: AbortSignal.timeout(5000) });
-        if (res.ok) {
-          // サーバー接続OK → トークンを確認
-          const meRes = await fetch('/api/auth/me', {
-            headers: { 'Authorization': 'Bearer ' + token },
-            signal: AbortSignal.timeout(5000)
-          });
-          if (meRes.ok) {
-            const freshMe = await meRes.json();
-            me = freshMe;
-            localStorage.setItem('user', JSON.stringify(me));
-            $('loading-screen').style.display = 'none';
-            startApp();
-            return;
-          } else {
-            // トークン無効 → ログイン画面へ
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            $('loading-screen').style.display = 'none';
-            $('login-screen').style.display = 'flex';
-            return;
-          }
-        }
-      } catch (e) {
-        // サーバーがまだ起動中
-        $('loading-msg').textContent = `サーバー起動中... (${i + 1}/10)`;
+    try {
+      const meRes = await fetch('/api/auth/me', {
+        headers: { 'Authorization': 'Bearer ' + token },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (meRes.ok) {
+        me = await meRes.json();
+        localStorage.setItem('user', JSON.stringify(me));
+        startApp();
+      } else {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        $('login-screen').style.display = 'flex';
       }
-      await new Promise(r => setTimeout(r, 3000));
+    } catch {
+      // オフラインでもlocalStorageのユーザー情報でアプリ起動
+      if (me && me.id) {
+        startApp();
+      } else {
+        $('login-screen').style.display = 'flex';
+        showError('サーバーに接続できませんでした。');
+      }
     }
-
-    // 接続できなかった場合
-    $('loading-screen').style.display = 'none';
-    $('login-screen').style.display = 'flex';
-    showError('サーバーに接続できませんでした。再度お試しください。');
   }
 
   autoLogin();

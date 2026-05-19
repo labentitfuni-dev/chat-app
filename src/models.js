@@ -6,7 +6,8 @@ const userSchema = new mongoose.Schema({
   password:    { type: String, required: true },
   friendCode:  { type: String, required: true, unique: true },
   friends:     [{ type: String }],
-  avatar:      { type: String, default: '' },
+  avatar:         { type: String, default: '' },
+  hideNotifContent: { type: Boolean, default: false },
 }, { timestamps: true });
 
 const messageSchema = new mongoose.Schema({

@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { Message } = require('./models');
+const { Message, User } = require('./models');
 const { sendPushNotification } = require('./push');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'chat-app-secret-key-change-in-production';
@@ -46,10 +46,11 @@ function setupSocket(io) {
       if (toSocketId) {
         io.to(toSocketId).emit('newMessage', out);
       } else {
-        const notifText = out.file ? '📎 ファイルが届きました' : out.text;
+        const recipient = await User.findById(toUserId).lean();
+        const hideContent = recipient?.hideNotifContent;
         sendPushNotification(toUserId, {
           title: socket.username,
-          body: notifText,
+          body: hideContent ? '新しいメッセージがあります' : (out.file ? '📎 ファイルが届きました' : out.text),
           icon: '/icon.svg',
           badge: '/icon.svg',
           data: { fromId: socket.userId }
