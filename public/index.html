@@ -518,7 +518,7 @@
           content += `<a class="msg-file" href="${msg.file.url}" download="${escapeHtml(msg.file.originalName)}" target="_blank"><span class="msg-file-icon">${icon}</span><span class="msg-file-info"><span class="msg-file-name">${escapeHtml(msg.file.originalName)}</span><span class="msg-file-size">${size}</span></span></a>`;
         }
       }
-      if (msg.text) content += `<span>${escapeHtml(msg.text)}</span>`;
+      if (msg.text) content += `<span>${linkify(escapeHtml(msg.text))}</span>`;
       row.innerHTML = `<div class="bubble ${isMine?'mine':'other'}">${content}<div class="msg-time">${time}</div></div>`;
       box.appendChild(row);
     });
@@ -615,6 +615,10 @@
   }
 
   function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+  function linkify(html) {
+    return html.replace(/(https?:\/\/[^\s&lt;&gt;"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all;">$1</a>');
+  }
 
   // ========== 音声・ビデオ通話（Jitsi Meet） ==========
   $('call-btn').onclick = () => startCall(currentContact);
