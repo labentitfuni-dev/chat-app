@@ -76,20 +76,30 @@ router.post('/add-friend', (req, res) => {
   try {
     const { id } = verifyToken(req);
     const { friendCode } = req.body;
-    const me = db.findUser({ id });
-    const friend = db.findUser({ friendCode });
 
+    if (!friendCode) return res.status(400).json({ error: 'IDを入力してください' });
+
+    const me = db.findUser({ id });
+    if (!me) return res.status(404).json({ error: 'ログインし直してください' });
+
+    const friend = db.findUser({ friendCode });
     if (!friend) return res.status(404).json({ error: 'そのIDのユーザーは見つかりません' });
     if (friend.id === id) return res.status(400).json({ error: '自分自身は追加できません' });
-    if (me.friends.includes(friend.id)) return res.status(400).json({ error: 'すでに友達です' });
+
+    const myFriends = me.friends || [];
+    const friendFriends = friend.friends || [];
+
+    if (myFriends.includes(friend.id)) return res.status(400).json({ error: 'すでに友達です' });
 
     // お互いに友達追加
-    db.updateUser(id, { friends: [...me.friends, friend.id] });
-    const friendData = db.findUser({ id: friend.id });
-    db.updateUser(friend.id, { friends: [...friendData.friends, id] });
+    db.updateUser(id, { friends: [...myFriends, friend.id] });
+    db.updateUser(friend.id, { friends: [...friendFriends, id] });
 
     res.json({ success: true, friend: { id: friend.id, username: friend.username, displayName: friend.displayName, friendCode: friend.friendCode } });
-  } catch (e) { res.status(401).json({ error: e.message }); }
+  } catch (e) {
+    console.error('add-friend error:', e.message);
+    res.status(500).json({ error: 'エラーが発生しました: ' + e.message });
+  }
 });
 
 // 友達一覧取得

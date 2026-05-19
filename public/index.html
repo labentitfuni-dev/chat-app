@@ -359,18 +359,30 @@
   $('search-btn').onclick = async () => {
     if (searchedUser) {
       // 友達追加実行
+      $('search-btn').disabled = true;
+      $('search-btn').textContent = '追加中...';
       try {
         const res = await fetch('/api/auth/add-friend', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
           body: JSON.stringify({ friendCode: searchedUser.friendCode })
         });
         const data = await res.json();
-        if (!res.ok) { $('modal-error').textContent = data.error; return; }
+        if (!res.ok) {
+          $('modal-error').textContent = data.error || '追加に失敗しました';
+          $('search-btn').textContent = '追加する';
+          $('search-btn').disabled = false;
+          return;
+        }
         friends.push(data.friend);
         renderFriends();
         $('add-friend-modal').style.display = 'none';
         openChat(data.friend);
-      } catch { $('modal-error').textContent = 'エラーが発生しました'; }
+      } catch (e) {
+        $('modal-error').textContent = 'エラー: ' + e.message;
+        $('search-btn').textContent = '追加する';
+      }
+      $('search-btn').disabled = false;
       return;
     }
     // 検索
