@@ -17,7 +17,14 @@ const messageSchema = new mongoose.Schema({
   read:     { type: Boolean, default: false },
 }, { timestamps: true });
 
+const pushSubSchema = new mongoose.Schema({
+  userId:       { type: String, required: true, index: true },
+  endpoint:     { type: String, required: true },
+  subscription: { type: Object, required: true },
+}, { timestamps: true });
+
 const User    = mongoose.model('User', userSchema);
 const Message = mongoose.model('Message', messageSchema);
+const PushSub = mongoose.model('PushSub', pushSubSchema);
 
-module.exports = { User, Message };
+module.exports = { User, Message, PushSub };

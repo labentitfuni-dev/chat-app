@@ -756,24 +756,25 @@
   async function registerPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
-      // Service Worker 登録
       const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
 
-      // 通知許可を求める
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') return;
 
-      // VAPIDキー取得
       const keyRes = await fetch('/api/push/vapid-public-key');
       const { key } = await keyRes.json();
 
-      // プッシュ購読
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key)
-      });
+      // 既存の購読を取得、なければ新規作成（毎回サーバーに登録してサーバー再起動に対応）
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(key)
+        });
+      }
 
-      // サーバーに登録
+      // 毎回サーバーに送信（サーバー再起動でデータが消えても再登録できる）
       await fetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
