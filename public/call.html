@@ -140,14 +140,19 @@
     const iceConfig = { iceServers: [
       { urls: 'stun:stun.l.google.com:19302'  },
       { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      // 無料TURN（複数フォールバック）
+      {
+        urls: ['turn:freestun.net:3478', 'turn:freestun.net:3479'],
+        username: 'free', credential: 'free'
+      },
       {
         urls: [
           'turn:openrelay.metered.ca:80',
           'turn:openrelay.metered.ca:443',
           'turn:openrelay.metered.ca:443?transport=tcp'
         ],
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
+        username: 'openrelayproject', credential: 'openrelayproject'
       }
     ]};
 
@@ -226,17 +231,22 @@
         const audio = $('remote-audio');
         audio.srcObject = e.streams[0];
         tryPlayAudio(audio);
+        // トラックが届いたら接続成功とみなしてタイマー開始
+        onCallConnected();
       };
 
       pc.onicecandidate = ({ candidate }) => {
         if (candidate) socket.emit('callIceCandidate', { roomId, candidate });
       };
 
-      pc.onconnectionstatechange = () => {
+      // ICE接続状態で細かくステータス更新
+      pc.oniceconnectionstatechange = () => {
         if (!pc) return;
-        if (pc.connectionState === 'connected')    onCallConnected();
-        if (pc.connectionState === 'disconnected') $('status').textContent = '接続が切れました...';
-        if (pc.connectionState === 'failed')       showError('接続に失敗しました。\nお互いのネット環境を確認してください。');
+        const s = pc.iceConnectionState;
+        if (s === 'checking')     $('status').textContent = '接続中...';
+        if (s === 'connected' || s === 'completed') onCallConnected();
+        if (s === 'disconnected') $('status').textContent = '再接続中...';
+        if (s === 'failed')       showError('接続に失敗しました。\n両方ともWi-Fiに繋いで\nもう一度試してください。');
       };
     }
 
