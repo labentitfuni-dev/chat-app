@@ -48,7 +48,7 @@ function setupSocket(io) {
       } else {
         const notifText = out.file ? '📎 ファイルが届きました' : out.text;
         sendPushNotification(toUserId, {
-          title: socket.username,
+          title: 'ChatApp',
           body: notifText,
           icon: '/icon.svg',
           badge: '/icon.svg',
@@ -72,7 +72,7 @@ function setupSocket(io) {
       // バックグラウンドでもプッシュ通知（/callページのURLを使う）
       const callUrl = signal?.jitsiUrl || signal?.fallbackUrl;
       sendPushNotification(toUserId, {
-        title: `📞 ${socket.username} から着信`,
+        title: '📞 着信',
         body: 'タップして通話に参加してください',
         icon: '/icon.svg',
         badge: '/icon.svg',
