@@ -25,6 +25,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // ルート
 app.use('/api/auth', require('./auth'));
+app.use('/api/upload', require('./upload'));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
 // Socket.io

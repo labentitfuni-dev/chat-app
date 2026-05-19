@@ -103,6 +103,24 @@
 
     #back-btn { display: none; background: none; border: none; color: white; font-size: 22px; cursor: pointer; padding: 4px 8px; }
 
+    /* ファイル添付 */
+    #attach-btn { background: none; border: none; font-size: 22px; cursor: pointer; padding: 4px 8px; color: #888; flex-shrink: 0; }
+    #attach-btn:hover { color: #06C755; }
+    #file-preview-bar { display: none; padding: 8px 12px; background: #f0faf4; border-top: 1px solid #d0ecd8; align-items: center; gap: 10px; }
+    #file-preview-bar img { max-height: 60px; max-width: 80px; border-radius: 6px; object-fit: cover; }
+    #file-preview-name { flex: 1; font-size: 13px; color: #444; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #file-preview-cancel { background: none; border: none; font-size: 18px; cursor: pointer; color: #888; }
+    .msg-image { max-width: 220px; max-height: 220px; border-radius: 12px; cursor: pointer; display: block; margin-bottom: 4px; }
+    .msg-file { display: flex; align-items: center; gap: 8px; padding: 8px 4px; text-decoration: none; color: inherit; }
+    .msg-file-icon { font-size: 24px; }
+    .msg-file-info { display: flex; flex-direction: column; }
+    .msg-file-name { font-size: 14px; font-weight: 600; }
+    .msg-file-size { font-size: 11px; opacity: 0.7; }
+    /* 画像拡大モーダル */
+    #img-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 300; justify-content: center; align-items: center; }
+    #img-modal img { max-width: 95vw; max-height: 90vh; border-radius: 8px; }
+    #img-modal-close { position: absolute; top: 16px; right: 20px; color: white; font-size: 32px; cursor: pointer; background: none; border: none; }
+
     @media (max-width: 600px) {
       #sidebar { width: 100%; }
       #chat-panel { display: none; }
@@ -163,11 +181,25 @@
       <button id="call-btn" title="音声通話">📞</button>
     </div>
     <div id="messages"></div>
+    <div id="file-preview-bar">
+      <span id="file-preview-icon" style="font-size:24px"></span>
+      <img id="file-preview-img" src="" style="display:none">
+      <span id="file-preview-name"></span>
+      <button id="file-preview-cancel">✕</button>
+    </div>
     <div id="input-area">
+      <input type="file" id="file-input" style="display:none" accept="*/*">
+      <button id="attach-btn" title="ファイル・写真を送る">📎</button>
       <textarea id="msg-input" placeholder="メッセージを入力..." rows="1"></textarea>
       <button id="send-btn">送信</button>
     </div>
   </div>
+</div>
+
+<!-- 画像拡大モーダル -->
+<div id="img-modal">
+  <button id="img-modal-close">✕</button>
+  <img id="img-modal-img" src="">
 </div>
 
 <!-- 友達追加モーダル -->
@@ -397,21 +429,115 @@
       const row = document.createElement('div');
       row.className = 'msg-row ' + (isMine ? 'mine' : 'other');
       const time = new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-      row.innerHTML = `<div class="bubble ${isMine?'mine':'other'}">${escapeHtml(msg.text)}<div class="msg-time">${time}</div></div>`;
+      let content = '';
+      if (msg.file) {
+        if (msg.file.type === 'image') {
+          content += `<img class="msg-image" src="${msg.file.url}" alt="${escapeHtml(msg.file.originalName)}" onclick="openImgModal('${msg.file.url}')">`;
+        } else if (msg.file.type === 'video') {
+          content += `<video controls style="max-width:220px;border-radius:12px;display:block;margin-bottom:4px"><source src="${msg.file.url}"></video>`;
+        } else {
+          const icon = getFileIcon(msg.file.mimeType);
+          const size = formatFileSize(msg.file.size);
+          content += `<a class="msg-file" href="${msg.file.url}" download="${escapeHtml(msg.file.originalName)}" target="_blank"><span class="msg-file-icon">${icon}</span><span class="msg-file-info"><span class="msg-file-name">${escapeHtml(msg.file.originalName)}</span><span class="msg-file-size">${size}</span></span></a>`;
+        }
+      }
+      if (msg.text) content += `<span>${escapeHtml(msg.text)}</span>`;
+      row.innerHTML = `<div class="bubble ${isMine?'mine':'other'}">${content}<div class="msg-time">${time}</div></div>`;
       box.appendChild(row);
     });
     box.scrollTop = box.scrollHeight;
   }
 
+  function getFileIcon(mime) {
+    if (!mime) return '📄';
+    if (mime.includes('pdf')) return '📕';
+    if (mime.includes('word') || mime.includes('document')) return '📝';
+    if (mime.includes('excel') || mime.includes('sheet')) return '📊';
+    if (mime.includes('zip') || mime.includes('rar') || mime.includes('7z')) return '🗜️';
+    if (mime.includes('audio')) return '🎵';
+    return '📄';
+  }
+
+  function formatFileSize(bytes) {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + 'B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';
+    return (bytes / 1024 / 1024).toFixed(1) + 'MB';
+  }
+
+  // 画像拡大
+  window.openImgModal = (url) => {
+    $('img-modal-img').src = url;
+    $('img-modal').style.display = 'flex';
+  };
+  $('img-modal').onclick = (e) => { if (e.target === $('img-modal') || e.target === $('img-modal-close')) $('img-modal').style.display = 'none'; };
+
+  // ========== ファイル添付 ==========
+  let pendingFile = null;
+
+  $('attach-btn').onclick = () => $('file-input').click();
+
+  $('file-input').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    pendingFile = file;
+    $('file-preview-bar').style.display = 'flex';
+    $('file-preview-name').textContent = file.name;
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      $('file-preview-img').src = url;
+      $('file-preview-img').style.display = 'block';
+      $('file-preview-icon').textContent = '';
+    } else {
+      $('file-preview-img').style.display = 'none';
+      $('file-preview-icon').textContent = getFileIcon(file.type);
+    }
+    $('file-input').value = '';
+  };
+
+  $('file-preview-cancel').onclick = () => {
+    pendingFile = null;
+    $('file-preview-bar').style.display = 'none';
+    $('file-preview-img').src = '';
+  };
+
   $('send-btn').onclick = sendMessage;
   $('msg-input').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
-  function sendMessage() {
+
+  async function sendMessage() {
     const text = $('msg-input').value.trim();
-    if (!text || !currentContact || !socket) return;
-    socket.emit('sendMessage', { toUserId: currentContact.id, text });
+    if (!text && !pendingFile) return;
+    if (!currentContact || !socket) return;
+
+    let fileData = null;
+    if (pendingFile) {
+      const formData = new FormData();
+      formData.append('file', pendingFile);
+      try {
+        $('send-btn').textContent = '送信中';
+        $('send-btn').disabled = true;
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token },
+          body: formData
+        });
+        fileData = await res.json();
+      } catch {
+        alert('ファイルのアップロードに失敗しました');
+        return;
+      } finally {
+        $('send-btn').textContent = '送信';
+        $('send-btn').disabled = false;
+      }
+      pendingFile = null;
+      $('file-preview-bar').style.display = 'none';
+    }
+
+    socket.emit('sendMessage', { toUserId: currentContact.id, text, file: fileData });
     $('msg-input').value = '';
   }
-  function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+  function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 
   // ========== 音声通話 ==========
   const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };

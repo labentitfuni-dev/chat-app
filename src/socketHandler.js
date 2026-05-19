@@ -26,11 +26,13 @@ function setupSocket(io) {
       socket.emit('messageHistory', db.getMessages(socket.userId, toUserId));
     });
 
-    socket.on('sendMessage', ({ toUserId, text }) => {
-      if (!text || !toUserId) return;
+    socket.on('sendMessage', ({ toUserId, text, file }) => {
+      if ((!text && !file) || !toUserId) return;
       const message = {
         id: uuidv4(), fromId: socket.userId, fromName: socket.username,
-        toId: toUserId, text, createdAt: new Date().toISOString(), read: false
+        toId: toUserId, text: text || '',
+        file: file || null, // { url, originalName, mimeType, type }
+        createdAt: new Date().toISOString(), read: false
       };
       db.addMessage(message);
       socket.emit('newMessage', message);
