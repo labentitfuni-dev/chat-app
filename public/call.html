@@ -48,12 +48,21 @@
     .btn-speaker { width: 64px; height: 64px; font-size: 26px; background: #2a2a3e; color: white; }
     .btn-speaker.active { background: #06C755; }
 
-    /* 音声有効化バナー */
+    /* 音声有効化オーバーレイ */
     #audio-banner {
-      display: none; position: fixed; bottom: 160px;
-      background: rgba(255,200,0,0.15); border: 1px solid rgba(255,200,0,0.4);
-      border-radius: 12px; padding: 12px 20px; font-size: 14px; color: #ffe082;
-      text-align: center; cursor: pointer;
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.75);
+      flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+    }
+    #audio-banner .tap-btn {
+      background: #06C755; color: white; border: none; border-radius: 50px;
+      padding: 20px 48px; font-size: 20px; font-weight: bold; cursor: pointer;
+      animation: pulse-green 1.2s ease-in-out infinite;
+    }
+    #audio-banner p { color: #ccc; font-size: 14px; }
+    @keyframes pulse-green {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(6,199,85,0.5); }
+      50%       { box-shadow: 0 0 0 16px rgba(6,199,85,0); }
     }
 
     #error-box {
@@ -119,8 +128,9 @@
     </div>
   </div>
 
-  <div id="audio-banner" onclick="enableAudio()">
-    🔊 タップして音声を有効にする
+  <div id="audio-banner">
+    <button class="tap-btn" onclick="enableAudio()">🔊 タップして音声を開始</button>
+    <p>ブラウザの制限により手動で音声を有効にする必要があります</p>
   </div>
 
   <div id="error-box">
@@ -247,19 +257,35 @@
     function tryPlayAudio(audio) {
       audio.play().then(() => {
         $('audio-banner').style.display = 'none';
+        $('speaker-btn').classList.add('active');
       }).catch(() => {
-        // autoplay blocked → バナーを表示してタップを促す
-        $('audio-banner').style.display = 'block';
+        $('audio-banner').style.display = 'flex';
       });
     }
 
     function enableAudio() {
       const audio = $('remote-audio');
-      audio.play().then(() => {
-        $('audio-banner').style.display = 'none';
-        $('speaker-btn').classList.add('active');
-      }).catch(() => {});
+      // AudioContextを確実にアンロック
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      ctx.resume().then(() => {
+        audio.play().then(() => {
+          $('audio-banner').style.display = 'none';
+          $('speaker-btn').classList.add('active');
+          ctx.close();
+        }).catch(() => {});
+      });
     }
+
+    // 画面のどこをタップしても音声有効化を試みる
+    document.addEventListener('touchstart', () => {
+      const audio = $('remote-audio');
+      if (audio.srcObject && audio.paused) {
+        audio.play().then(() => {
+          $('audio-banner').style.display = 'none';
+          $('speaker-btn').classList.add('active');
+        }).catch(() => {});
+      }
+    }, { passive: true });
 
     function onCallConnected() {
       if (timerStarted) return;
