@@ -358,15 +358,22 @@
     socket.on('callEnded', () => { closeCallModal(); showToast('通話終了'); });
     socket.on('callFailed', ({ reason }) => {
       clearCallTimeout();
+      // closeCallModal の前に保存（closeCallModal が currentCallContact を null にするため）
+      const jitsiUrl = currentJitsiUrl;
+      const callContact = currentCallContact;
       closeCallModal();
-      if (currentJitsiUrl && currentCallContact) {
+      if (jitsiUrl && callContact) {
+        // チャットにURLを送る
         socket.emit('sendMessage', {
-          toUserId: currentCallContact.id,
-          text: `📞 通話リクエスト（タップして参加）\n${currentJitsiUrl}`,
+          toUserId: callContact.id,
+          text: `📞 通話リクエスト（タップして参加）\n${jitsiUrl}`,
           file: null
         });
-        window.open(currentJitsiUrl, '_blank');
-        showToast('📵 オフライン - 通知とリンクを送りました');
+        // window.open はポップアップブロックされるのでボタンで開かせる
+        showCallModal(callContact, 'オフラインのため通知を送りました', [
+          { label: '📞 通話を開始', cls: 'accept', fn: () => { closeCallModal(); window.open(jitsiUrl, '_blank'); }},
+          { label: '閉じる', cls: 'end', fn: closeCallModal }
+        ]);
         currentJitsiUrl = null;
       } else {
         showToast('📵 ' + (reason || '相手はオフラインです'));
@@ -701,7 +708,8 @@
 
     // 30秒で応答なしなら自動キャンセル
     callTimeoutId = setTimeout(() => {
-      socket.emit('rejectCall', { toUserId: contact.id });
+      const tid = currentCallContact?.id;
+      if (tid) socket.emit('rejectCall', { toUserId: tid });
       closeCallModal();
       showToast('📵 応答がありません');
     }, 30000);
