@@ -17,12 +17,11 @@
     body { background: #f0f0f0; height: 100vh; display: flex; flex-direction: column; }
 
     /* ログイン画面 */
-    #login-screen { flex: 1; background: #06C755; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-    #login-screen-inner { min-height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px 16px; }
-    .login-card { background: white; border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+    #login-screen { position: fixed; inset: 0; background: #06C755; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; align-items: center; padding: 60px 16px 40px; }
+    .login-card { background: white; border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); margin: auto 0; }
     .login-card h1 { text-align: center; font-size: 26px; margin-bottom: 4px; }
     .login-card p { text-align: center; color: #888; margin-bottom: 20px; }
-    .login-card input { width: 100%; padding: 12px 16px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; outline: none; -webkit-text-size-adjust: 100%; -webkit-appearance: none; }
+    .login-card input { width: 100%; padding: 12px 16px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; outline: none; -webkit-text-size-adjust: 100%; -webkit-appearance: none; touch-action: manipulation; cursor: text; }
     .login-card input:focus { border-color: #06C755; }
     .btn-green { width: 100%; padding: 13px; background: #06C755; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
     .btn-green:hover { background: #05a847; }
@@ -233,20 +232,18 @@
 
 <!-- ログイン画面 -->
 <div id="login-screen">
-  <div id="login-screen-inner">
-    <div id="login-install-bar" onclick="showInstallGuide()">📲 ホーム画面に追加してアプリとして使う →</div>
-    <div class="login-card">
-      <h1>💬 ChatApp</h1>
-      <p id="login-subtitle">ログイン</p>
-      <div id="register-fields" style="display:none">
-        <input id="displayname-input" type="text" placeholder="表示名（任意）" autocomplete="name" ontouchstart="">
-      </div>
-      <input id="username-input" type="text" placeholder="ユーザー名" autocomplete="username" autocorrect="off" autocapitalize="none" ontouchstart="">
-      <input id="password-input" type="password" placeholder="パスワード" autocomplete="current-password" ontouchstart="">
-      <div id="error-msg" class="error-msg"></div>
-      <button class="btn-green" id="auth-btn" ontouchstart="">ログイン</button>
-      <p class="switch-link" id="switch-link">アカウントを作成する →</p>
+  <div id="login-install-bar" onclick="showInstallGuide()">📲 ホーム画面に追加してアプリとして使う →</div>
+  <div class="login-card">
+    <h1>💬 ChatApp</h1>
+    <p id="login-subtitle">ログイン</p>
+    <div id="register-fields" style="display:none">
+      <input id="displayname-input" type="text" placeholder="表示名（任意）" autocomplete="name" autocorrect="off" autocapitalize="none">
     </div>
+    <input id="username-input" type="text" placeholder="ユーザー名" autocomplete="username" autocorrect="off" autocapitalize="none">
+    <input id="password-input" type="password" placeholder="パスワード" autocomplete="current-password">
+    <div id="error-msg" class="error-msg"></div>
+    <button class="btn-green" id="auth-btn">ログイン</button>
+    <p class="switch-link" id="switch-link">アカウントを作成する →</p>
   </div>
 </div>
 
