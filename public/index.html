@@ -121,6 +121,23 @@
     #msg-input:focus { border-color: #06C755; }
     #send-btn { padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 24px; font-size: 14px; font-weight: bold; cursor: pointer; }
 
+    /* インストールガイドモーダル */
+    #install-guide-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); justify-content: center; align-items: flex-end; z-index: 400; }
+    #install-guide-box { background: white; border-radius: 24px 24px 0 0; padding: 28px 24px 40px; width: 100%; max-width: 480px; margin: 0 auto; }
+    #install-guide-box h3 { font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 6px; }
+    #install-guide-box .ig-sub { text-align: center; color: #888; font-size: 14px; margin-bottom: 24px; }
+    .ig-step { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+    .ig-step:last-of-type { border-bottom: none; }
+    .ig-num { width: 30px; height: 30px; border-radius: 50%; background: #06C755; color: white; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ig-text { font-size: 15px; color: #333; line-height: 1.4; }
+    .ig-text strong { color: #06C755; }
+    .ig-icon { font-size: 22px; flex-shrink: 0; }
+    #install-guide-close { margin-top: 20px; width: 100%; padding: 14px; background: #06C755; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    #install-guide-safari-btn { margin-top: 12px; width: 100%; padding: 14px; background: #007AFF; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; display: none; }
+
+    /* ログイン画面のインストール誘導バナー */
+    #login-install-bar { display: none; background: #06C755; color: white; padding: 12px 16px; text-align: center; font-size: 14px; font-weight: bold; cursor: pointer; border-radius: 10px; margin-bottom: 16px; }
+
     /* モーダル共通 */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; }
     .modal-box { background: white; border-radius: 20px; padding: 28px; width: 320px; }
@@ -215,6 +232,7 @@
 
 <!-- ログイン画面 -->
 <div id="login-screen">
+  <div id="login-install-bar" onclick="showInstallGuide()">📲 ホーム画面に追加してアプリとして使う →</div>
   <div class="login-card">
     <h1>💬 ChatApp</h1>
     <p id="login-subtitle">ログイン</p>
@@ -355,7 +373,7 @@
       </label>
     </div>
     <div class="settings-section">アカウント</div>
-    <div class="settings-row" style="cursor:pointer" onclick="$('install-btn').click()">
+    <div class="settings-row" style="cursor:pointer" onclick="showInstallGuide()">
       <div class="settings-row-label">ホーム画面に追加</div>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="#aaa"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
     </div>
@@ -414,6 +432,45 @@
 
 <!-- トースト通知 -->
 <div id="toast"></div>
+
+<!-- ホーム画面追加ガイドモーダル -->
+<div id="install-guide-modal" onclick="if(event.target===this)closeInstallGuide()">
+  <div id="install-guide-box">
+    <h3>📲 ホーム画面に追加</h3>
+    <p class="ig-sub" id="ig-subtitle">アプリのようにすぐ開けます</p>
+    <div id="ig-steps-ios">
+      <div class="ig-step">
+        <div class="ig-num">1</div>
+        <span class="ig-icon">🧭</span>
+        <div class="ig-text"><strong>Safari</strong> でこのページを開く<br><span style="color:#888;font-size:13px">LINEやWhatsAppのブラウザからは追加できません</span></div>
+      </div>
+      <div class="ig-step">
+        <div class="ig-num">2</div>
+        <span class="ig-icon">⬆️</span>
+        <div class="ig-text">画面下の <strong>共有ボタン</strong>（四角と矢印のマーク）をタップ</div>
+      </div>
+      <div class="ig-step">
+        <div class="ig-num">3</div>
+        <span class="ig-icon">➕</span>
+        <div class="ig-text"><strong>「ホーム画面に追加」</strong> をタップして完了</div>
+      </div>
+    </div>
+    <div id="ig-steps-android" style="display:none">
+      <div class="ig-step">
+        <div class="ig-num">1</div>
+        <span class="ig-icon">⋮</span>
+        <div class="ig-text">ブラウザ右上の <strong>メニュー（⋮）</strong> をタップ</div>
+      </div>
+      <div class="ig-step">
+        <div class="ig-num">2</div>
+        <span class="ig-icon">➕</span>
+        <div class="ig-text"><strong>「ホーム画面に追加」</strong> をタップして完了</div>
+      </div>
+    </div>
+    <button id="install-guide-safari-btn" onclick="openInSafari()">Safariで開く</button>
+    <button id="install-guide-close" onclick="closeInstallGuide()">閉じる</button>
+  </div>
+</div>
 
 <script>
   const $ = id => document.getElementById(id);
@@ -1321,41 +1378,88 @@
     if (el) el.addEventListener('touchstart', function() { this.focus(); }, { passive: true });
   });
 
+  // ========== インストール判定ユーティリティ ==========
+  function isIos() { return /iP(hone|ad|od)/.test(navigator.userAgent); }
+  function isInAppBrowser() {
+    const ua = navigator.userAgent;
+    return /Line\/|FBAN|FBAV|WhatsApp|Instagram|Snapchat|Twitter|TikTok/.test(ua);
+  }
+  function isInStandaloneMode() {
+    return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  }
+
+  // ========== インストールガイドモーダル ==========
+  function showInstallGuide() {
+    const modal = $('install-guide-modal');
+    const iosSteps = $('ig-steps-ios');
+    const androidSteps = $('ig-steps-android');
+    const safariBtn = $('install-guide-safari-btn');
+
+    if (isIos()) {
+      iosSteps.style.display = 'block';
+      androidSteps.style.display = 'none';
+      // LINE/WhatsApp内蔵ブラウザからはSafariで開くボタンを表示
+      safariBtn.style.display = isInAppBrowser() ? 'block' : 'none';
+    } else {
+      iosSteps.style.display = 'none';
+      androidSteps.style.display = 'block';
+      safariBtn.style.display = 'none';
+      // Androidはネイティブプロンプトを優先
+      if (deferredInstallPrompt) {
+        closeInstallGuide();
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.then(r => { if (r.outcome === 'accepted') deferredInstallPrompt = null; });
+        return;
+      }
+    }
+    modal.style.display = 'flex';
+  }
+
+  function closeInstallGuide() {
+    $('install-guide-modal').style.display = 'none';
+  }
+
+  function openInSafari() {
+    // 内蔵ブラウザからSafariで開く
+    window.open(location.href, '_blank');
+  }
+
+  // Android: beforeinstallprompt をキャプチャ
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredInstallPrompt = e;
     $('install-btn').style.display = 'block';
   });
 
-  // インストール済みになったらボタンを隠す
   window.addEventListener('appinstalled', () => {
     $('install-btn').style.display = 'none';
     deferredInstallPrompt = null;
     showToast('✅ ホーム画面に追加しました！');
   });
 
-  $('install-btn').onclick = async () => {
-    if (deferredInstallPrompt) {
-      deferredInstallPrompt.prompt();
-      const { outcome } = await deferredInstallPrompt.userChoice;
-      if (outcome === 'accepted') deferredInstallPrompt = null;
-    }
-  };
+  // Android用install-btnクリック
+  $('install-btn').onclick = () => showInstallGuide();
 
-  // iOS Safari: beforeinstallprompt が発火しないので案内バナーを表示
-  function isIosSafari() {
-    const ua = navigator.userAgent;
-    return /iP(hone|ad|od)/.test(ua) && /WebKit/.test(ua) && !/CriOS|FxiOS|OPiOS/.test(ua);
-  }
-  function isInStandaloneMode() {
-    return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-  }
-
+  // 設定の「ホーム画面に追加」行もガイドを開く
   function showIosBannerIfNeeded() {
-    if (isIosSafari() && !isInStandaloneMode() && !localStorage.getItem('ios-banner-dismissed')) {
-      $('ios-install-banner').style.display = 'flex';
+    if (!isInStandaloneMode()) {
+      // ログイン画面のバーを表示
+      $('login-install-bar').style.display = 'block';
+      // アプリ内バナー（iOS Safari のみ）
+      const ua = navigator.userAgent;
+      const isIosSafari = isIos() && /WebKit/.test(ua) && !/CriOS|FxiOS|OPiOS/.test(ua);
+      if (isIosSafari && !localStorage.getItem('ios-banner-dismissed')) {
+        $('ios-install-banner').style.display = 'flex';
+      }
     }
   }
+
+  // ログイン画面でも最初からバーを表示
+  (function() {
+    if (!isInStandaloneMode()) {
+      $('login-install-bar').style.display = 'block';
+    }
+  })();
 
   $('ios-banner-close').onclick = () => {
     $('ios-install-banner').style.display = 'none';
