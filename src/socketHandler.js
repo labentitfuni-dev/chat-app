@@ -66,6 +66,15 @@ function setupSocket(io) {
       const toSocketId = onlineUsers.get(toUserId);
       if (toSocketId) io.to(toSocketId).emit('incomingCall', { fromId: socket.userId, fromName: socket.username, signal });
       else socket.emit('callFailed', { reason: '相手はオフラインです' });
+
+      // バックグラウンドでも着信通知が届くようにプッシュ通知を送る
+      sendPushNotification(toUserId, {
+        title: `📞 ${socket.username} から着信`,
+        body: 'タップして通話に参加してください',
+        icon: '/icon.svg',
+        badge: '/icon.svg',
+        data: { type: 'call', fromId: socket.userId, jitsiUrl: signal?.jitsiUrl }
+      });
     });
 
     socket.on('answerCall', ({ toUserId, signal }) => {

@@ -15,12 +15,18 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const data = event.notification.data || {};
+
+  // 通話通知の場合はJitsiのURLを直接開く
+  if (data.type === 'call' && data.jitsiUrl) {
+    event.waitUntil(clients.openWindow(data.jitsiUrl));
+    return;
+  }
+
+  // 通常のメッセージ通知はアプリを開く
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      if (list.length > 0) {
-        list[0].focus();
-        return;
-      }
+      if (list.length > 0) { list[0].focus(); return; }
       return clients.openWindow('/');
     })
   );
