@@ -1084,11 +1084,18 @@
 
   }
 
+  // SWが更新されたら自動でページをリロード
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+  }
+
   async function registerPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
       const reg = await navigator.serviceWorker.register('/sw.js');
-      await reg.update();
+      await reg.update(); // 新しいSWがあれば即チェック
       await navigator.serviceWorker.ready;
 
       const perm = Notification.permission;

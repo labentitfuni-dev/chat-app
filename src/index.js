@@ -25,6 +25,12 @@ app.get('/call', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'call.html'));
 });
 
+// sw.js は絶対にキャッシュさせない
+app.get('/sw.js', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '..', 'public', 'sw.js'));
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use('/api/auth', require('./auth'));
