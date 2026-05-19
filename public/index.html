@@ -17,25 +17,13 @@
     body { background: #f0f0f0; height: 100vh; display: flex; flex-direction: column; }
 
     /* ログイン画面 */
-    #login-screen {
-      flex: 1; display: flex; justify-content: center; align-items: center;
-      background: #06C755;
-    }
-    .login-card {
-      background: white; border-radius: 16px; padding: 32px; width: 340px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    }
+    #login-screen { flex: 1; display: flex; justify-content: center; align-items: center; background: #06C755; }
+    .login-card { background: white; border-radius: 16px; padding: 32px; width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
     .login-card h1 { text-align: center; font-size: 28px; margin-bottom: 4px; }
     .login-card p { text-align: center; color: #888; margin-bottom: 24px; }
-    .login-card input {
-      width: 100%; padding: 12px 16px; margin-bottom: 12px; border: 1px solid #ddd;
-      border-radius: 10px; font-size: 15px; outline: none;
-    }
+    .login-card input { width: 100%; padding: 12px 16px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 15px; outline: none; }
     .login-card input:focus { border-color: #06C755; }
-    .btn-green {
-      width: 100%; padding: 13px; background: #06C755; color: white; border: none;
-      border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;
-    }
+    .btn-green { width: 100%; padding: 13px; background: #06C755; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
     .btn-green:hover { background: #05a847; }
     .switch-link { text-align: center; margin-top: 14px; color: #06C755; cursor: pointer; font-size: 14px; }
     .error-msg { color: #e53935; font-size: 13px; margin-bottom: 8px; text-align: center; }
@@ -43,119 +31,86 @@
     /* メイン画面 */
     #app-screen { flex: 1; display: none; flex-direction: row; height: 100vh; }
 
-    /* 左パネル（連絡先） */
-    #sidebar {
-      width: 300px; background: white; border-right: 1px solid #e0e0e0;
-      display: flex; flex-direction: column;
-    }
-    #sidebar-header {
-      background: #06C755; color: white; padding: 16px;
-      display: flex; justify-content: space-between; align-items: center;
-    }
+    /* サイドバー */
+    #sidebar { width: 300px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; }
+    #sidebar-header { background: #06C755; color: white; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
     #sidebar-header h2 { font-size: 18px; }
+    #header-btns { display: flex; gap: 8px; align-items: center; }
+    #add-friend-btn { background: rgba(255,255,255,0.25); border: none; color: white; cursor: pointer; font-size: 20px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
     #logout-btn { background: none; border: none; color: white; cursor: pointer; font-size: 13px; }
-    #my-name { padding: 10px 16px; background: #f9f9f9; font-size: 13px; color: #666; border-bottom: 1px solid #eee; }
+
+    /* 自分のID表示 */
+    #my-info { padding: 10px 16px; background: #f0faf4; border-bottom: 1px solid #e0f0e8; }
+    #my-info-name { font-size: 13px; color: #444; font-weight: 600; }
+    #my-info-code { font-size: 12px; color: #06C755; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+    #copy-code-btn { font-size: 11px; background: #06C755; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; }
+
     #contacts-list { flex: 1; overflow-y: auto; }
-    .contact-item {
-      padding: 14px 16px; cursor: pointer; display: flex; align-items: center;
-      border-bottom: 1px solid #f0f0f0; transition: background 0.15s;
-    }
+    .contact-item { padding: 14px 16px; cursor: pointer; display: flex; align-items: center; border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
     .contact-item:hover { background: #f5f5f5; }
     .contact-item.active { background: #e8f5e9; }
-    .avatar {
-      width: 44px; height: 44px; border-radius: 50%; background: #06C755;
-      display: flex; align-items: center; justify-content: center;
-      color: white; font-size: 18px; font-weight: bold; margin-right: 12px;
-      flex-shrink: 0; position: relative;
-    }
-    .online-dot {
-      position: absolute; bottom: 1px; right: 1px; width: 11px; height: 11px;
-      background: #4CAF50; border-radius: 50%; border: 2px solid white;
-    }
+    .avatar { width: 44px; height: 44px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; font-weight: bold; margin-right: 12px; flex-shrink: 0; position: relative; }
+    .online-dot { position: absolute; bottom: 1px; right: 1px; width: 11px; height: 11px; background: #4CAF50; border-radius: 50%; border: 2px solid white; }
     .contact-info { flex: 1; }
     .contact-name { font-size: 15px; font-weight: 600; }
     .contact-status { font-size: 12px; color: #aaa; margin-top: 2px; }
     .contact-status.online { color: #06C755; }
 
-    /* 右パネル（チャット） */
+    /* チャットパネル */
     #chat-panel { flex: 1; display: flex; flex-direction: column; }
-    #chat-header {
-      background: #06C755; color: white; padding: 14px 20px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    #chat-header h3 { font-size: 17px; }
-    #call-btn {
-      background: none; border: none; color: white; font-size: 22px; cursor: pointer;
-      padding: 4px 8px; border-radius: 8px;
-    }
+    #chat-header { background: #06C755; color: white; padding: 14px 16px; display: flex; align-items: center; gap: 8px; }
+    #chat-header h3 { flex: 1; font-size: 17px; }
+    #call-btn { background: none; border: none; color: white; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
     #call-btn:hover { background: rgba(255,255,255,0.2); }
-    #no-chat {
-      flex: 1; display: flex; align-items: center; justify-content: center; color: #aaa;
-    }
-    #messages {
-      flex: 1; overflow-y: auto; padding: 16px; background: #e8f5e9;
-      display: none; flex-direction: column; gap: 6px;
-    }
+    #no-chat { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #aaa; gap: 12px; }
+    #no-chat-add { background: #06C755; color: white; border: none; border-radius: 20px; padding: 10px 20px; font-size: 14px; cursor: pointer; }
+    #messages { flex: 1; overflow-y: auto; padding: 16px; background: #e8f5e9; display: none; flex-direction: column; gap: 6px; }
     .msg-row { display: flex; }
     .msg-row.mine { justify-content: flex-end; }
-    .msg-row.other { justify-content: flex-start; }
-    .bubble {
-      max-width: 65%; padding: 8px 14px; border-radius: 18px; font-size: 15px; line-height: 1.4;
-    }
+    .bubble { max-width: 65%; padding: 8px 14px; border-radius: 18px; font-size: 15px; line-height: 1.4; }
     .bubble.mine { background: #06C755; color: white; border-bottom-right-radius: 4px; }
     .bubble.other { background: white; color: #333; border-bottom-left-radius: 4px; }
     .msg-time { font-size: 10px; margin-top: 3px; opacity: 0.6; text-align: right; }
-    #input-area {
-      display: none; padding: 10px; background: white;
-      border-top: 1px solid #eee; gap: 8px; align-items: center;
-    }
-    #msg-input {
-      flex: 1; padding: 10px 16px; border: 1px solid #ddd; border-radius: 24px;
-      font-size: 15px; outline: none; resize: none;
-    }
+    #input-area { display: none; padding: 10px; background: white; border-top: 1px solid #eee; gap: 8px; align-items: center; }
+    #msg-input { flex: 1; padding: 10px 16px; border: 1px solid #ddd; border-radius: 24px; font-size: 15px; outline: none; resize: none; }
     #msg-input:focus { border-color: #06C755; }
-    #send-btn {
-      padding: 10px 20px; background: #06C755; color: white; border: none;
-      border-radius: 24px; font-size: 14px; font-weight: bold; cursor: pointer;
-    }
-    #send-btn:hover { background: #05a847; }
+    #send-btn { padding: 10px 20px; background: #06C755; color: white; border: none; border-radius: 24px; font-size: 14px; font-weight: bold; cursor: pointer; }
+
+    /* モーダル共通 */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; }
+    .modal-box { background: white; border-radius: 20px; padding: 28px; width: 320px; }
+    .modal-box h3 { font-size: 18px; margin-bottom: 16px; text-align: center; }
+    .modal-box input { width: 100%; padding: 12px 16px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; outline: none; margin-bottom: 12px; text-align: center; letter-spacing: 4px; font-size: 20px; font-weight: bold; }
+    .modal-box input:focus { border-color: #06C755; }
+    .modal-btns { display: flex; gap: 8px; }
+    .modal-btns button { flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 15px; font-weight: bold; cursor: pointer; }
+    .btn-cancel { background: #f0f0f0; color: #666; }
+    .btn-confirm { background: #06C755; color: white; }
+    .search-result { padding: 12px; background: #f9f9f9; border-radius: 10px; margin-bottom: 12px; display: none; align-items: center; gap: 12px; }
+    .search-result .avatar { width: 40px; height: 40px; font-size: 16px; margin-right: 0; }
+    .modal-error { color: #e53935; font-size: 13px; text-align: center; margin-bottom: 8px; }
 
     /* 通話モーダル */
-    #call-modal {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
-      justify-content: center; align-items: center; z-index: 100;
-    }
-    .call-box {
-      background: #1a1a2e; border-radius: 24px; padding: 48px 40px;
-      text-align: center; width: 320px;
-    }
-    .call-avatar {
-      width: 100px; height: 100px; border-radius: 50%; background: #06C755;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 42px; font-weight: bold; color: white; margin: 0 auto 16px;
-    }
+    #call-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 200; }
+    .call-box { background: #1a1a2e; border-radius: 24px; padding: 48px 40px; text-align: center; width: 320px; }
+    .call-avatar { width: 100px; height: 100px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: bold; color: white; margin: 0 auto 16px; }
     .call-name { color: white; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
     .call-status { color: #aaa; font-size: 15px; margin-bottom: 32px; }
     .call-buttons { display: flex; justify-content: center; gap: 16px; }
-    .call-btn {
-      padding: 14px 28px; border-radius: 40px; border: none; font-size: 15px;
-      font-weight: bold; color: white; cursor: pointer;
-    }
+    .call-btn { padding: 14px 28px; border-radius: 40px; border: none; font-size: 15px; font-weight: bold; color: white; cursor: pointer; }
     .call-btn.accept { background: #06C755; }
     .call-btn.reject, .call-btn.end { background: #e53935; }
-    .call-btn:hover { opacity: 0.85; }
+
+    #back-btn { display: none; background: none; border: none; color: white; font-size: 22px; cursor: pointer; padding: 4px 8px; }
 
     @media (max-width: 600px) {
       #sidebar { width: 100%; }
       #chat-panel { display: none; }
       #sidebar.hidden { display: none; }
-      #chat-panel.show { display: flex; position: fixed; inset: 0; z-index: 10; background: white; }
-      #back-btn { display: flex !important; }
+      #chat-panel.show { display: flex; position: fixed; inset: 0; z-index: 10; background: white; flex-direction: column; }
+      #back-btn { display: block; }
       .bubble { max-width: 80%; }
-    }
-    #back-btn {
-      display: none; background: none; border: none; color: white;
-      font-size: 22px; cursor: pointer; padding: 4px 8px; margin-right: 4px;
+      .modal-box { width: 90%; margin: 0 16px; }
     }
   </style>
 </head>
@@ -181,23 +136,57 @@
 <div id="app-screen">
   <div id="sidebar">
     <div id="sidebar-header">
-      <h2>トーク</h2>
-      <button id="logout-btn">ログアウト</button>
+      <h2>💬 トーク</h2>
+      <div id="header-btns">
+        <button id="add-friend-btn" title="友達追加">＋</button>
+        <button id="logout-btn">ログアウト</button>
+      </div>
     </div>
-    <div id="my-name"></div>
+    <div id="my-info">
+      <div id="my-info-name"></div>
+      <div id="my-info-code">
+        <span>友達ID: <strong id="my-code"></strong></span>
+        <button id="copy-code-btn">コピー</button>
+      </div>
+    </div>
     <div id="contacts-list"></div>
   </div>
+
   <div id="chat-panel">
-    <div id="no-chat"><p>連絡先を選んでチャットを開始</p></div>
+    <div id="no-chat">
+      <p>友達を追加してチャットを始めよう</p>
+      <button id="no-chat-add">＋ 友達を追加</button>
+    </div>
     <div id="chat-header" style="display:none">
       <button id="back-btn">←</button>
-      <h3 id="chat-contact-name" style="flex:1"></h3>
+      <h3 id="chat-contact-name"></h3>
       <button id="call-btn" title="音声通話">📞</button>
     </div>
     <div id="messages"></div>
     <div id="input-area">
       <textarea id="msg-input" placeholder="メッセージを入力..." rows="1"></textarea>
       <button id="send-btn">送信</button>
+    </div>
+  </div>
+</div>
+
+<!-- 友達追加モーダル -->
+<div class="modal-overlay" id="add-friend-modal">
+  <div class="modal-box">
+    <h3>👤 友達追加</h3>
+    <p style="text-align:center;color:#888;font-size:13px;margin-bottom:14px">相手の6桁IDを入力してください</p>
+    <input id="friend-code-input" type="text" placeholder="000000" maxlength="6" inputmode="numeric">
+    <div id="search-result" class="search-result">
+      <div class="avatar" id="result-avatar"></div>
+      <div>
+        <div id="result-name" style="font-weight:600"></div>
+        <div id="result-code" style="font-size:12px;color:#888"></div>
+      </div>
+    </div>
+    <div id="modal-error" class="modal-error"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="cancel-add-btn">キャンセル</button>
+      <button class="btn-confirm" id="search-btn">検索</button>
     </div>
   </div>
 </div>
@@ -219,14 +208,11 @@
   let socket = null;
   let currentContact = null;
   let messages = {};
-  let users = [];
+  let friends = [];
   let onlineSet = new Set();
   let isLogin = true;
-  // WebRTC
-  let pc = null;
-  let callTimer = null;
-  let callDuration = 0;
-  let currentCallContact = null;
+  let searchedUser = null;
+  let pc = null, callTimer = null, callDuration = 0, currentCallContact = null;
 
   // ========== 認証 ==========
   $('switch-link').onclick = () => {
@@ -253,57 +239,60 @@
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(me));
       startApp();
-    } catch(e) { showError('サーバーに接続できません'); }
+    } catch { showError('サーバーに接続できません'); }
   };
-
   $('password-input').onkeydown = e => { if (e.key === 'Enter') $('auth-btn').click(); };
-
   function showError(msg) { $('error-msg').textContent = msg; }
 
   // ========== アプリ起動 ==========
   function startApp() {
     $('login-screen').style.display = 'none';
     $('app-screen').style.display = 'flex';
-    $('my-name').textContent = 'ログイン中: ' + (me.displayName || me.username);
+    $('my-info-name').textContent = me.displayName || me.username;
+    $('my-code').textContent = me.friendCode;
     connectSocket();
-    fetchUsers();
+    fetchFriends();
   }
 
-  $('logout-btn').onclick = () => {
-    localStorage.removeItem('token'); localStorage.removeItem('user');
-    location.reload();
+  $('logout-btn').onclick = () => { localStorage.removeItem('token'); localStorage.removeItem('user'); location.reload(); };
+
+  $('copy-code-btn').onclick = () => {
+    navigator.clipboard.writeText(me.friendCode).then(() => {
+      $('copy-code-btn').textContent = '✓';
+      setTimeout(() => $('copy-code-btn').textContent = 'コピー', 1500);
+    });
   };
 
-  // ========== Socket.io ==========
+  // ========== Socket ==========
   function connectSocket() {
     socket = io({ auth: { token } });
-    socket.on('userOnline', ({ userId }) => { onlineSet.add(userId); renderUsers(); });
-    socket.on('userOffline', ({ userId }) => { onlineSet.delete(userId); renderUsers(); });
+    socket.on('userOnline', ({ userId }) => { onlineSet.add(userId); renderFriends(); });
+    socket.on('userOffline', ({ userId }) => { onlineSet.delete(userId); renderFriends(); });
     socket.on('newMessage', onNewMessage);
     socket.on('incomingCall', onIncomingCall);
     socket.on('callAccepted', onCallAccepted);
-    socket.on('callRejected', () => { closeCallModal('相手が拒否しました'); });
-    socket.on('callEnded', () => { closeCallModal('通話終了'); });
+    socket.on('callRejected', () => closeCallModal('相手が拒否しました'));
+    socket.on('callEnded', () => closeCallModal('通話終了'));
     socket.on('iceCandidate', async ({ candidate }) => {
       if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
     });
   }
 
-  // ========== 連絡先 ==========
-  async function fetchUsers() {
-    const res = await fetch('/api/auth/users', { headers: { Authorization: 'Bearer ' + token } });
-    users = (await res.json()).filter(u => u.id !== me.id);
-    renderUsers();
+  // ========== 友達一覧 ==========
+  async function fetchFriends() {
+    const res = await fetch('/api/auth/friends', { headers: { Authorization: 'Bearer ' + token } });
+    friends = await res.json();
+    renderFriends();
   }
 
-  function renderUsers() {
+  function renderFriends() {
     const list = $('contacts-list');
     list.innerHTML = '';
-    if (!users.length) {
-      list.innerHTML = '<div style="padding:20px;text-align:center;color:#aaa">他のユーザーがいません<br><small>別のタブで別アカウントを作ってください</small></div>';
+    if (!friends.length) {
+      list.innerHTML = '<div style="padding:24px;text-align:center;color:#aaa;font-size:14px">友達がいません<br><small style="font-size:12px">右上の＋ボタンで友達追加</small></div>';
       return;
     }
-    users.forEach(u => {
+    friends.forEach(u => {
       const online = onlineSet.has(u.id);
       const div = document.createElement('div');
       div.className = 'contact-item' + (currentContact?.id === u.id ? ' active' : '');
@@ -311,21 +300,74 @@
         <div class="avatar">${(u.displayName||u.username)[0].toUpperCase()}${online ? '<div class="online-dot"></div>' : ''}</div>
         <div class="contact-info">
           <div class="contact-name">${u.displayName || u.username}</div>
-          <div class="contact-status ${online ? 'online' : ''}">${online ? 'オンライン' : 'オフライン'}</div>
+          <div class="contact-status ${online?'online':''}">${online ? 'オンライン' : 'オフライン'}</div>
         </div>`;
       div.onclick = () => openChat(u);
       list.appendChild(div);
     });
   }
 
-  const isMobile = () => window.innerWidth <= 600;
+  // ========== 友達追加モーダル ==========
+  function openAddFriendModal() {
+    $('friend-code-input').value = '';
+    $('modal-error').textContent = '';
+    $('search-result').style.display = 'none';
+    $('search-btn').textContent = '検索';
+    searchedUser = null;
+    $('add-friend-modal').style.display = 'flex';
+    setTimeout(() => $('friend-code-input').focus(), 100);
+  }
 
-  $('back-btn').onclick = () => {
-    $('sidebar').classList.remove('hidden');
-    $('chat-panel').classList.remove('show');
+  $('add-friend-btn').onclick = openAddFriendModal;
+  $('no-chat-add').onclick = openAddFriendModal;
+  $('cancel-add-btn').onclick = () => { $('add-friend-modal').style.display = 'none'; };
+
+  $('search-btn').onclick = async () => {
+    if (searchedUser) {
+      // 友達追加実行
+      try {
+        const res = await fetch('/api/auth/add-friend', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ friendCode: searchedUser.friendCode })
+        });
+        const data = await res.json();
+        if (!res.ok) { $('modal-error').textContent = data.error; return; }
+        friends.push(data.friend);
+        renderFriends();
+        $('add-friend-modal').style.display = 'none';
+        openChat(data.friend);
+      } catch { $('modal-error').textContent = 'エラーが発生しました'; }
+      return;
+    }
+    // 検索
+    const code = $('friend-code-input').value.trim();
+    if (code.length !== 6) { $('modal-error').textContent = '6桁のIDを入力してください'; return; }
+    $('modal-error').textContent = '';
+    try {
+      const res = await fetch(`/api/auth/search/${code}`, { headers: { Authorization: 'Bearer ' + token } });
+      const data = await res.json();
+      if (!res.ok) { $('modal-error').textContent = data.error; $('search-result').style.display = 'none'; return; }
+      searchedUser = data;
+      $('result-avatar').textContent = (data.displayName||data.username)[0].toUpperCase();
+      $('result-name').textContent = data.displayName || data.username;
+      $('result-code').textContent = 'ID: ' + data.friendCode;
+      $('search-result').style.display = 'flex';
+      $('search-btn').textContent = '追加する';
+    } catch { $('modal-error').textContent = 'エラーが発生しました'; }
   };
 
+  $('friend-code-input').onkeydown = e => {
+    if (e.key === 'Enter') $('search-btn').click();
+    // 数字のみ
+    if (!/[0-9]/.test(e.key) && !['Backspace','Delete','Tab','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+  };
+  $('friend-code-input').oninput = () => { searchedUser = null; $('search-btn').textContent = '検索'; $('search-result').style.display = 'none'; $('modal-error').textContent = ''; };
+
   // ========== チャット ==========
+  const isMobile = () => window.innerWidth <= 600;
+
+  $('back-btn').onclick = () => { $('sidebar').classList.remove('hidden'); $('chat-panel').classList.remove('show'); };
+
   function openChat(contact) {
     currentContact = contact;
     $('no-chat').style.display = 'none';
@@ -333,25 +375,17 @@
     $('messages').style.display = 'flex';
     $('input-area').style.display = 'flex';
     $('chat-contact-name').textContent = contact.displayName || contact.username;
-    if (isMobile()) {
-      $('sidebar').classList.add('hidden');
-      $('chat-panel').classList.add('show');
-    }
-    renderUsers();
+    if (isMobile()) { $('sidebar').classList.add('hidden'); $('chat-panel').classList.add('show'); }
+    renderFriends();
     if (!messages[contact.id]) messages[contact.id] = [];
     socket.emit('getMessages', { toUserId: contact.id });
-    socket.once('messageHistory', msgs => {
-      messages[contact.id] = msgs;
-      renderMessages();
-    });
+    socket.once('messageHistory', msgs => { messages[contact.id] = msgs; renderMessages(); });
   }
 
   function onNewMessage(msg) {
     const partnerId = msg.fromId === me.id ? msg.toId : msg.fromId;
     if (!messages[partnerId]) messages[partnerId] = [];
-    if (!messages[partnerId].find(m => m.id === msg.id)) {
-      messages[partnerId].push(msg);
-    }
+    if (!messages[partnerId].find(m => m.id === msg.id)) messages[partnerId].push(msg);
     if (currentContact?.id === partnerId) renderMessages();
   }
 
@@ -363,7 +397,7 @@
       const row = document.createElement('div');
       row.className = 'msg-row ' + (isMine ? 'mine' : 'other');
       const time = new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-      row.innerHTML = `<div class="bubble ${isMine ? 'mine' : 'other'}">${escapeHtml(msg.text)}<div class="msg-time">${time}</div></div>`;
+      row.innerHTML = `<div class="bubble ${isMine?'mine':'other'}">${escapeHtml(msg.text)}<div class="msg-time">${time}</div></div>`;
       box.appendChild(row);
     });
     box.scrollTop = box.scrollHeight;
@@ -371,41 +405,34 @@
 
   $('send-btn').onclick = sendMessage;
   $('msg-input').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
-
   function sendMessage() {
     const text = $('msg-input').value.trim();
     if (!text || !currentContact || !socket) return;
     socket.emit('sendMessage', { toUserId: currentContact.id, text });
     $('msg-input').value = '';
   }
+  function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 
-  function escapeHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-  }
-
-  // ========== WebRTC 音声通話 ==========
+  // ========== 音声通話 ==========
   const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-
   $('call-btn').onclick = () => startCall(currentContact);
 
   async function startCall(contact) {
     currentCallContact = contact;
-    showCallModal(contact, '呼び出し中...', [
-      { label: '📵 終了', cls: 'end', fn: endCall }
-    ]);
+    showCallModal(contact, '呼び出し中...', [{ label: '📵 終了', cls: 'end', fn: endCall }]);
     pc = new RTCPeerConnection(ICE);
     setupPCEvents(contact.id);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
-    } catch(e) { alert('マイクへのアクセスを許可してください'); closeCallModal(); return; }
+    } catch { alert('マイクへのアクセスを許可してください'); closeCallModal(); return; }
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit('callUser', { toUserId: contact.id, signal: offer });
   }
 
   function onIncomingCall({ fromId, fromName, signal }) {
-    const contact = users.find(u => u.id === fromId) || { id: fromId, displayName: fromName, username: fromName };
+    const contact = friends.find(u => u.id === fromId) || { id: fromId, displayName: fromName, username: fromName };
     currentCallContact = contact;
     showCallModal(contact, '着信中', [
       { label: '📞 受ける', cls: 'accept', fn: () => acceptCall(contact, signal) },
@@ -419,46 +446,28 @@
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
-    } catch(e) { alert('マイクへのアクセスを許可してください'); return; }
+    } catch { alert('マイクへのアクセスを許可してください'); return; }
     await pc.setRemoteDescription(new RTCSessionDescription(signal));
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     socket.emit('answerCall', { toUserId: contact.id, signal: answer });
     startCallTimer();
-    showCallModal(contact, '通話中 00:00', [
-      { label: '📵 終了', cls: 'end', fn: endCall }
-    ]);
+    showCallModal(contact, '通話中 00:00', [{ label: '📵 終了', cls: 'end', fn: endCall }]);
   }
 
   function setupPCEvents(toUserId) {
-    pc.onicecandidate = ({ candidate }) => {
-      if (candidate) socket.emit('iceCandidate', { toUserId, candidate });
-    };
-    pc.ontrack = ({ streams }) => {
-      const audio = new Audio();
-      audio.srcObject = streams[0];
-      audio.play();
-    };
+    pc.onicecandidate = ({ candidate }) => { if (candidate) socket.emit('iceCandidate', { toUserId, candidate }); };
+    pc.ontrack = ({ streams }) => { const a = new Audio(); a.srcObject = streams[0]; a.play(); };
   }
 
   function onCallAccepted({ signal }) {
     pc.setRemoteDescription(new RTCSessionDescription(signal));
     startCallTimer();
-    showCallModal(currentCallContact, '通話中 00:00', [
-      { label: '📵 終了', cls: 'end', fn: endCall }
-    ]);
+    showCallModal(currentCallContact, '通話中 00:00', [{ label: '📵 終了', cls: 'end', fn: endCall }]);
   }
 
-  function rejectCall() {
-    if (currentCallContact) socket.emit('rejectCall', { toUserId: currentCallContact.id });
-    closeCallModal();
-  }
-
-  function endCall() {
-    if (currentCallContact) socket.emit('endCall', { toUserId: currentCallContact.id });
-    if (pc) { pc.close(); pc = null; }
-    closeCallModal();
-  }
+  function rejectCall() { if (currentCallContact) socket.emit('rejectCall', { toUserId: currentCallContact.id }); closeCallModal(); }
+  function endCall() { if (currentCallContact) socket.emit('endCall', { toUserId: currentCallContact.id }); if (pc) { pc.close(); pc = null; } closeCallModal(); }
 
   function startCallTimer() {
     callDuration = 0;
@@ -477,13 +486,7 @@
     $('call-modal-status').textContent = status;
     const btns = $('call-buttons');
     btns.innerHTML = '';
-    buttons.forEach(b => {
-      const btn = document.createElement('button');
-      btn.className = 'call-btn ' + b.cls;
-      btn.textContent = b.label;
-      btn.onclick = b.fn;
-      btns.appendChild(btn);
-    });
+    buttons.forEach(b => { const btn = document.createElement('button'); btn.className = 'call-btn ' + b.cls; btn.textContent = b.label; btn.onclick = b.fn; btns.appendChild(btn); });
     $('call-modal').style.display = 'flex';
   }
 
@@ -495,7 +498,6 @@
     if (msg) setTimeout(() => alert(msg), 100);
   }
 
-  // ========== 起動時の自動ログイン ==========
   if (token && me) startApp();
 </script>
 </body>
