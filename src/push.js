@@ -15,6 +15,16 @@ router.get('/vapid-public-key', (req, res) => {
   res.json({ key: VAPID_PUBLIC });
 });
 
+router.post('/unsubscribe', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: '認証が必要です' });
+  try {
+    const { id } = jwt.verify(token, JWT_SECRET);
+    await PushSub.deleteMany({ userId: id });
+    res.json({ success: true });
+  } catch { res.status(401).json({ error: 'トークンが無効です' }); }
+});
+
 router.post('/subscribe', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: '認証が必要です' });
