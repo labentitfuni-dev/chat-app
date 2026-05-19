@@ -93,13 +93,24 @@
     /* 通話モーダル */
     #call-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 200; }
     .call-box { background: #1a1a2e; border-radius: 24px; padding: 48px 40px; text-align: center; width: 320px; }
-    .call-avatar { width: 100px; height: 100px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: bold; color: white; margin: 0 auto 16px; }
+    .call-avatar { width: 100px; height: 100px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: bold; color: white; margin: 0 auto 16px; position: relative; }
+    .call-avatar.ringing::before, .call-avatar.ringing::after {
+      content: ''; position: absolute; border-radius: 50%;
+      border: 3px solid rgba(6,199,85,0.5); animation: ring-pulse 1.5s ease-out infinite;
+    }
+    .call-avatar.ringing::after { animation-delay: 0.5s; }
+    @keyframes ring-pulse {
+      0% { width: 100px; height: 100px; opacity: 1; }
+      100% { width: 160px; height: 160px; opacity: 0; }
+    }
     .call-name { color: white; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
     .call-status { color: #aaa; font-size: 15px; margin-bottom: 32px; }
     .call-buttons { display: flex; justify-content: center; gap: 16px; }
     .call-btn { padding: 14px 28px; border-radius: 40px; border: none; font-size: 15px; font-weight: bold; color: white; cursor: pointer; }
     .call-btn.accept { background: #06C755; }
     .call-btn.reject, .call-btn.end { background: #e53935; }
+    /* トースト */
+    #toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.75); color: white; padding: 10px 22px; border-radius: 20px; font-size: 14px; display: none; z-index: 500; white-space: nowrap; }
 
     #back-btn { display: none; background: none; border: none; color: white; font-size: 22px; cursor: pointer; padding: 4px 8px; }
 
@@ -255,6 +266,9 @@
   </div>
 </div>
 
+<!-- トースト通知 -->
+<div id="toast"></div>
+
 <script>
   const $ = id => document.getElementById(id);
   let token = localStorage.getItem('token');
@@ -267,6 +281,7 @@
   let isLogin = true;
   let searchedUser = null;
   let pc = null, callTimer = null, callDuration = 0, currentCallContact = null;
+  let ringtone = null, pendingJitsiUrl = null, currentJitsiUrl = null;
 
   // ========== 認証 ==========
   $('switch-link').onclick = () => {
@@ -327,8 +342,8 @@
     socket.on('newMessage', onNewMessage);
     socket.on('incomingCall', onIncomingCall);
     socket.on('callAccepted', onCallAccepted);
-    socket.on('callRejected', () => closeCallModal('相手が拒否しました'));
-    socket.on('callEnded', () => closeCallModal('通話終了'));
+    socket.on('callRejected', () => { closeCallModal(); showToast('📵 相手が拒否しました'); });
+    socket.on('callEnded', () => { closeCallModal(); showToast('通話終了'); });
     socket.on('iceCandidate', async ({ candidate }) => {
       if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
     });
@@ -595,30 +610,112 @@
     return 'chatapp-' + Math.random().toString(36).substring(2, 10);
   }
 
+  // LINEそっくりの着信音（Web Audio API）
+  function createRingtone() {
+    let ctx, playing = true, timeoutId;
+    try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return { stop() {} }; }
+
+    // LINE風メロディ: G5 E5 G5 E5 C5 G4
+    const melody = [
+      { f: 784, d: 0.12 }, { f: 659, d: 0.12 }, { f: 784, d: 0.12 }, { f: 659, d: 0.12 },
+      { f: 523, d: 0.20 }, { f: 392, d: 0.28 }
+    ];
+
+    function playNote(freq, startTime, duration) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.35, startTime + 0.02);
+      gain.gain.linearRampToValueAtTime(0, startTime + duration - 0.02);
+      osc.start(startTime); osc.stop(startTime + duration);
+    }
+
+    function playSequence() {
+      if (!playing) return;
+      let t = ctx.currentTime + 0.05;
+      melody.forEach(n => { playNote(n.f, t, n.d); t += n.d + 0.02; });
+      const total = melody.reduce((s, n) => s + n.d + 0.02, 0);
+      timeoutId = setTimeout(playSequence, (total + 0.6) * 1000);
+    }
+
+    // iOSはユーザー操作後にAudioContextを resume する必要がある
+    ctx.resume().then(playSequence);
+
+    return { stop() { playing = false; clearTimeout(timeoutId); try { ctx.close(); } catch {} } };
+  }
+
   function startCall(contact) {
     const roomId = generateRoomId();
     const callUrl = `https://meet.jit.si/${roomId}`;
+    currentCallContact = contact;
+    currentJitsiUrl = callUrl;
 
-    // 相手に通話リンクをチャットで送る
-    socket.emit('sendMessage', {
-      toUserId: contact.id,
-      text: `📞 通話リクエスト\n${me.displayName || me.username} さんから着信です。\n下のリンクをタップして通話に参加してください👇\n${callUrl}`,
-      file: null
-    });
+    // Socket.io で相手に着信通知（Jitsi URLを signal に乗せる）
+    socket.emit('callUser', { toUserId: contact.id, signal: { jitsiUrl: callUrl } });
 
-    // 自分もすぐ通話ルームへ
-    window.open(callUrl, '_blank');
+    // 発信中モーダル
+    showCallModal(contact, '発信中...', [
+      { label: '✕ キャンセル', cls: 'end', fn: () => {
+        socket.emit('rejectCall', { toUserId: contact.id });
+        closeCallModal();
+      }}
+    ]);
   }
 
   function onIncomingCall({ fromId, fromName, signal }) {
-    // Jitsi切り替え後は使わないが互換性のため残す
+    const caller = friends.find(f => f.id === fromId) || { id: fromId, displayName: fromName, username: fromName };
+    currentCallContact = caller;
+    pendingJitsiUrl = signal?.jitsiUrl;
+
+    // 着信音を鳴らす
+    ringtone = createRingtone();
+
+    // バイブレーション（Android対応）
+    if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+
+    // 着信モーダル（アバターにリングアニメ付き）
+    showCallModal(caller, '着信中...', [
+      { label: '✓ 応答', cls: 'accept', fn: acceptIncomingCall },
+      { label: '✕ 拒否', cls: 'reject', fn: rejectIncomingCall }
+    ]);
+    $('call-avatar-letter').classList.add('ringing');
   }
-  function onCallAccepted({ signal }) {}
-  function rejectCall() {}
-  function endCall() {}
+
+  function acceptIncomingCall() {
+    if (ringtone) { ringtone.stop(); ringtone = null; }
+    if (navigator.vibrate) navigator.vibrate(0);
+    socket.emit('answerCall', { toUserId: currentCallContact?.id, signal: {} });
+    closeCallModal();
+    if (pendingJitsiUrl) window.open(pendingJitsiUrl, '_blank');
+    pendingJitsiUrl = null;
+  }
+
+  function rejectIncomingCall() {
+    if (ringtone) { ringtone.stop(); ringtone = null; }
+    if (navigator.vibrate) navigator.vibrate(0);
+    socket.emit('rejectCall', { toUserId: currentCallContact?.id });
+    closeCallModal();
+  }
+
+  function onCallAccepted({ signal }) {
+    closeCallModal();
+    if (currentJitsiUrl) window.open(currentJitsiUrl, '_blank');
+    currentJitsiUrl = null;
+  }
+
+  function showToast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 3000);
+  }
 
   function showCallModal(contact, status, buttons) {
     $('call-avatar-letter').textContent = (contact.displayName||contact.username)[0].toUpperCase();
+    $('call-avatar-letter').classList.remove('ringing');
     $('call-modal-name').textContent = contact.displayName || contact.username;
     $('call-modal-status').textContent = status;
     const btns = $('call-buttons');
@@ -627,12 +724,13 @@
     $('call-modal').style.display = 'flex';
   }
 
-  function closeCallModal(msg) {
+  function closeCallModal() {
     if (callTimer) { clearInterval(callTimer); callTimer = null; }
     if (pc) { pc.close(); pc = null; }
+    if (ringtone) { ringtone.stop(); ringtone = null; }
+    $('call-avatar-letter').classList.remove('ringing');
     $('call-modal').style.display = 'none';
     currentCallContact = null;
-    if (msg) setTimeout(() => alert(msg), 100);
   }
 
   // ========== プッシュ通知 ==========
