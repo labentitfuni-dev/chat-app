@@ -195,7 +195,8 @@
       #sidebar { width: 100%; }
       #chat-panel { display: none; }
       #sidebar.hidden { display: none; }
-      #chat-panel.show { display: flex; position: fixed; inset: 0; z-index: 10; background: white; flex-direction: column; }
+      #chat-panel.show { display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 10; background: white; flex-direction: column; }
+      #messages { -webkit-overflow-scrolling: touch; }
       #back-btn { display: block; }
       .bubble { max-width: 80%; }
       .modal-box { width: 90%; margin: 0 16px; }
@@ -1189,6 +1190,19 @@
   let deferredInstallPrompt = null;
 
   // Android / Chrome: インストールイベントをキャプチャ
+  // iOSキーボード表示時にチャットパネルがずれる問題を修正
+  if (window.visualViewport) {
+    const chatPanel = $('chat-panel');
+    const adjustLayout = () => {
+      if (!chatPanel.classList.contains('show')) return;
+      const vv = window.visualViewport;
+      const offsetBottom = window.innerHeight - vv.height - vv.offsetTop;
+      chatPanel.style.bottom = Math.max(0, offsetBottom) + 'px';
+    };
+    window.visualViewport.addEventListener('resize', adjustLayout);
+    window.visualViewport.addEventListener('scroll', adjustLayout);
+  }
+
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredInstallPrompt = e;
