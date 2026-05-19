@@ -1,13 +1,25 @@
+const SW_VERSION = 3;
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting(); // 即座に新しいSWを有効化
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim()); // 既存タブにも即反映
+});
+
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  const data = event.data.json();
+  let data;
+  try { data = event.data.json(); } catch { return; }
   event.waitUntil(
     self.registration.showNotification(data.title || 'ChatApp', {
       body: data.body || '',
       icon: data.icon || '/icon.svg',
       badge: data.badge || '/icon.svg',
-      vibrate: [200, 100, 200],
+      vibrate: [400, 200, 400],
       data: data.data || {},
+      requireInteraction: data.data?.type === 'call', // 通話通知は消えない
       actions: [{ action: 'open', title: '開く' }]
     })
   );
@@ -17,17 +29,31 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
 
-  // 通話通知の場合はJitsiのURLを直接開く
+  // 通話通知はJitsiのURLを直接開く
   if (data.type === 'call' && data.jitsiUrl) {
     event.waitUntil(clients.openWindow(data.jitsiUrl));
     return;
   }
 
-  // 通常のメッセージ通知はアプリを開く
+  // メッセージ通知はアプリを開く
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      if (list.length > 0) { list[0].focus(); return; }
+      for (const c of list) {
+        if (c.url.includes(self.location.origin) && 'focus' in c) return c.focus();
+      }
       return clients.openWindow('/');
     })
+  );
+});
+
+// プッシュ購読が期限切れになったとき自動で再購読
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    self.registration.pushManager.subscribe(event.oldSubscription.options)
+      .then((sub) => fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub)
+      }))
   );
 });

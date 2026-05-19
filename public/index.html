@@ -793,7 +793,9 @@
   async function registerPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
+      // SWを登録＆即座に最新版に更新
       const reg = await navigator.serviceWorker.register('/sw.js');
+      await reg.update(); // 新しいSWがあれば即更新
       await navigator.serviceWorker.ready;
 
       const permission = await Notification.requestPermission();
@@ -802,16 +804,17 @@
       const keyRes = await fetch('/api/push/vapid-public-key');
       const { key } = await keyRes.json();
 
-      // 既存の購読を取得、なければ新規作成（毎回サーバーに登録してサーバー再起動に対応）
+      // 既存の購読を確認
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
+        // 新規購読
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(key)
         });
       }
 
-      // 毎回サーバーに送信（サーバー再起動でデータが消えても再登録できる）
+      // 毎回サーバーに登録（サーバー再起動後も即復活）
       await fetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
