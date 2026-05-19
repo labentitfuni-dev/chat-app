@@ -1420,8 +1420,9 @@
   }
 
   function openInSafari() {
-    // 内蔵ブラウザからSafariで開く
-    window.open(location.href, '_blank');
+    // x-safari-https:// スキームでSafariを直接起動（iOS）
+    const safariUrl = location.href.replace(/^https:\/\//, 'x-safari-https://');
+    location.href = safariUrl;
   }
 
   // Android: beforeinstallprompt をキャプチャ
