@@ -541,72 +541,34 @@
 
   function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 
-  // ========== 音声通話 ==========
-  const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+  // ========== 音声・ビデオ通話（Jitsi Meet） ==========
   $('call-btn').onclick = () => startCall(currentContact);
 
-  async function startCall(contact) {
-    currentCallContact = contact;
-    showCallModal(contact, '呼び出し中...', [{ label: '📵 終了', cls: 'end', fn: endCall }]);
-    pc = new RTCPeerConnection(ICE);
-    setupPCEvents(contact.id);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => pc.addTrack(t, stream));
-    } catch { alert('マイクへのアクセスを許可してください'); closeCallModal(); return; }
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    socket.emit('callUser', { toUserId: contact.id, signal: offer });
+  function generateRoomId() {
+    return 'chatapp-' + Math.random().toString(36).substring(2, 10);
+  }
+
+  function startCall(contact) {
+    const roomId = generateRoomId();
+    const callUrl = `https://meet.jit.si/${roomId}`;
+
+    // 相手に通話リンクをチャットで送る
+    socket.emit('sendMessage', {
+      toUserId: contact.id,
+      text: `📞 通話リクエスト\n${me.displayName || me.username} さんから着信です。\n下のリンクをタップして通話に参加してください👇\n${callUrl}`,
+      file: null
+    });
+
+    // 自分もすぐ通話ルームへ
+    window.open(callUrl, '_blank');
   }
 
   function onIncomingCall({ fromId, fromName, signal }) {
-    const contact = friends.find(u => u.id === fromId) || { id: fromId, displayName: fromName, username: fromName };
-    currentCallContact = contact;
-    showCallModal(contact, '着信中', [
-      { label: '📞 受ける', cls: 'accept', fn: () => acceptCall(contact, signal) },
-      { label: '📵 断る', cls: 'reject', fn: rejectCall }
-    ]);
+    // Jitsi切り替え後は使わないが互換性のため残す
   }
-
-  async function acceptCall(contact, signal) {
-    pc = new RTCPeerConnection(ICE);
-    setupPCEvents(contact.id);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => pc.addTrack(t, stream));
-    } catch { alert('マイクへのアクセスを許可してください'); return; }
-    await pc.setRemoteDescription(new RTCSessionDescription(signal));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    socket.emit('answerCall', { toUserId: contact.id, signal: answer });
-    startCallTimer();
-    showCallModal(contact, '通話中 00:00', [{ label: '📵 終了', cls: 'end', fn: endCall }]);
-  }
-
-  function setupPCEvents(toUserId) {
-    pc.onicecandidate = ({ candidate }) => { if (candidate) socket.emit('iceCandidate', { toUserId, candidate }); };
-    pc.ontrack = ({ streams }) => { const a = new Audio(); a.srcObject = streams[0]; a.play(); };
-  }
-
-  function onCallAccepted({ signal }) {
-    pc.setRemoteDescription(new RTCSessionDescription(signal));
-    startCallTimer();
-    showCallModal(currentCallContact, '通話中 00:00', [{ label: '📵 終了', cls: 'end', fn: endCall }]);
-  }
-
-  function rejectCall() { if (currentCallContact) socket.emit('rejectCall', { toUserId: currentCallContact.id }); closeCallModal(); }
-  function endCall() { if (currentCallContact) socket.emit('endCall', { toUserId: currentCallContact.id }); if (pc) { pc.close(); pc = null; } closeCallModal(); }
-
-  function startCallTimer() {
-    callDuration = 0;
-    if (callTimer) clearInterval(callTimer);
-    callTimer = setInterval(() => {
-      callDuration++;
-      const m = String(Math.floor(callDuration/60)).padStart(2,'0');
-      const s = String(callDuration%60).padStart(2,'0');
-      $('call-modal-status').textContent = `通話中 ${m}:${s}`;
-    }, 1000);
-  }
+  function onCallAccepted({ signal }) {}
+  function rejectCall() {}
+  function endCall() {}
 
   function showCallModal(contact, status, buttons) {
     $('call-avatar-letter').textContent = (contact.displayName||contact.username)[0].toUpperCase();
