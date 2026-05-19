@@ -162,6 +162,7 @@
     </div>
     <div id="my-info">
       <div id="my-info-name"></div>
+      <div style="font-size:12px;color:#888;margin-top:2px">ログインID: <span id="my-username"></span></div>
       <div id="my-info-code">
         <span>友達ID: <strong id="my-code"></strong></span>
         <button id="copy-code-btn">コピー</button>
@@ -281,6 +282,7 @@
     $('login-screen').style.display = 'none';
     $('app-screen').style.display = 'flex';
     $('my-info-name').textContent = me.displayName || me.username;
+    $('my-username').textContent = me.username;
     $('my-code').textContent = me.friendCode;
     connectSocket();
     fetchFriends();
