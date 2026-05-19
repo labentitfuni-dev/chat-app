@@ -1,8 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
-const db = require('./db');
+const { User } = require('./models');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'chat-app-secret-key-change-in-production';
@@ -13,105 +12,98 @@ function verifyToken(req) {
   return jwt.verify(token, JWT_SECRET);
 }
 
-function generateFriendCode() {
-  // 6桁のユニークなID
+function safeUser(u) {
+  return { id: u._id.toString(), username: u.username, displayName: u.displayName, friendCode: u.friendCode, friends: u.friends || [] };
+}
+
+async function generateFriendCode() {
   let code;
   do {
     code = String(Math.floor(100000 + Math.random() * 900000));
-  } while (db.findUser({ friendCode: code }));
+  } while (await User.findOne({ friendCode: code }));
   return code;
 }
 
 router.post('/register', async (req, res) => {
-  const { username, password, displayName } = req.body;
-  if (!username || !password) return res.status(400).json({ error: 'ユーザー名とパスワードは必須です' });
-  if (db.findUser({ username })) return res.status(409).json({ error: 'このユーザー名は既に使われています' });
+  try {
+    const { username, password, displayName } = req.body;
+    if (!username || !password) return res.status(400).json({ error: 'ユーザー名とパスワードは必須です' });
+    if (await User.findOne({ username })) return res.status(409).json({ error: 'このユーザー名は既に使われています' });
 
-  const user = {
-    id: uuidv4(),
-    username,
-    displayName: displayName || username,
-    password: await bcrypt.hash(password, 10),
-    friendCode: generateFriendCode(),
-    friends: [],
-    createdAt: new Date().toISOString()
-  };
-  db.addUser(user);
+    const user = await User.create({
+      username,
+      displayName: displayName || username,
+      password: await bcrypt.hash(password, 10),
+      friendCode: await generateFriendCode(),
+      friends: []
+    });
 
-  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, user: { id: user.id, username: user.username, displayName: user.displayName, friendCode: user.friendCode, friends: [] } });
+    const token = jwt.sign({ id: user._id.toString(), username: user.username }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: safeUser(user) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const user = db.findUser({ username });
-  if (!user || !(await bcrypt.compare(password, user.password)))
-    return res.status(401).json({ error: 'ユーザー名またはパスワードが違います' });
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+    if (!user || !(await bcrypt.compare(password, user.password)))
+      return res.status(401).json({ error: 'ユーザー名またはパスワードが違います' });
 
-  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, user: { id: user.id, username: user.username, displayName: user.displayName, friendCode: user.friendCode, friends: user.friends } });
+    const token = jwt.sign({ id: user._id.toString(), username: user.username }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: safeUser(user) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   try {
     const { id } = verifyToken(req);
-    const user = db.findUser({ id });
+    const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: 'ユーザーが見つかりません' });
-    res.json({ id: user.id, username: user.username, displayName: user.displayName, friendCode: user.friendCode, friends: user.friends });
+    res.json(safeUser(user));
   } catch { res.status(401).json({ error: 'トークンが無効です' }); }
 });
 
-// 友達検索（6桁IDで検索）
-router.get('/search/:friendCode', (req, res) => {
+router.get('/search/:friendCode', async (req, res) => {
   try {
     verifyToken(req);
-    const user = db.findUser({ friendCode: req.params.friendCode });
+    const user = await User.findOne({ friendCode: req.params.friendCode });
     if (!user) return res.status(404).json({ error: 'そのIDのユーザーは見つかりません' });
-    res.json({ id: user.id, username: user.username, displayName: user.displayName, friendCode: user.friendCode });
+    res.json({ id: user._id.toString(), username: user.username, displayName: user.displayName, friendCode: user.friendCode });
   } catch { res.status(401).json({ error: 'トークンが無効です' }); }
 });
 
-// 友達追加
-router.post('/add-friend', (req, res) => {
+router.post('/add-friend', async (req, res) => {
   try {
     const { id } = verifyToken(req);
     const { friendCode } = req.body;
-
     if (!friendCode) return res.status(400).json({ error: 'IDを入力してください' });
 
-    const me = db.findUser({ id });
+    const me = await User.findById(id);
     if (!me) return res.status(404).json({ error: 'ログインし直してください' });
 
-    const friend = db.findUser({ friendCode });
+    const friend = await User.findOne({ friendCode });
     if (!friend) return res.status(404).json({ error: 'そのIDのユーザーは見つかりません' });
-    if (friend.id === id) return res.status(400).json({ error: '自分自身は追加できません' });
+    if (friend._id.toString() === id) return res.status(400).json({ error: '自分自身は追加できません' });
+    if (me.friends.includes(friend._id.toString())) return res.status(400).json({ error: 'すでに友達です' });
 
-    const myFriends = me.friends || [];
-    const friendFriends = friend.friends || [];
+    await User.findByIdAndUpdate(id, { $push: { friends: friend._id.toString() } });
+    await User.findByIdAndUpdate(friend._id, { $push: { friends: id } });
 
-    if (myFriends.includes(friend.id)) return res.status(400).json({ error: 'すでに友達です' });
-
-    // お互いに友達追加
-    db.updateUser(id, { friends: [...myFriends, friend.id] });
-    db.updateUser(friend.id, { friends: [...friendFriends, id] });
-
-    res.json({ success: true, friend: { id: friend.id, username: friend.username, displayName: friend.displayName, friendCode: friend.friendCode } });
+    res.json({ success: true, friend: { id: friend._id.toString(), username: friend.username, displayName: friend.displayName, friendCode: friend.friendCode } });
   } catch (e) {
     console.error('add-friend error:', e.message);
-    res.status(500).json({ error: 'エラーが発生しました: ' + e.message });
+    res.status(500).json({ error: 'エラーが発生しました' });
   }
 });
 
-// 友達一覧取得
-router.get('/friends', (req, res) => {
+router.get('/friends', async (req, res) => {
   try {
     const { id } = verifyToken(req);
-    const me = db.findUser({ id });
-    const friends = (me.friends || []).map(fid => {
-      const u = db.findUser({ id: fid });
-      return u ? { id: u.id, username: u.username, displayName: u.displayName, friendCode: u.friendCode } : null;
-    }).filter(Boolean);
-    res.json(friends);
+    const me = await User.findById(id);
+    if (!me) return res.status(404).json({ error: 'ユーザーが見つかりません' });
+    const friendList = await User.find({ _id: { $in: me.friends } });
+    res.json(friendList.map(u => ({ id: u._id.toString(), username: u.username, displayName: u.displayName, friendCode: u.friendCode })));
   } catch { res.status(401).json({ error: 'トークンが無効です' }); }
 });
 

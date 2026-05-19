@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const db = require('./db');
+const { Message } = require('./models');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'chat-app-secret-key-change-in-production';
 const onlineUsers = new Map();
@@ -22,25 +22,32 @@ function setupSocket(io) {
     onlineUsers.set(socket.userId, socket.id);
     io.emit('userOnline', { userId: socket.userId });
 
-    socket.on('getMessages', ({ toUserId }) => {
-      socket.emit('messageHistory', db.getMessages(socket.userId, toUserId));
+    socket.on('getMessages', async ({ toUserId }) => {
+      const msgs = await Message.find({
+        $or: [
+          { fromId: socket.userId, toId: toUserId },
+          { fromId: toUserId, toId: socket.userId }
+        ]
+      }).sort({ createdAt: 1 }).lean();
+      socket.emit('messageHistory', msgs.map(m => ({ ...m, id: m._id.toString() })));
     });
 
-    socket.on('sendMessage', ({ toUserId, text, file }) => {
+    socket.on('sendMessage', async ({ toUserId, text, file }) => {
       if ((!text && !file) || !toUserId) return;
-      const message = {
-        id: uuidv4(), fromId: socket.userId, fromName: socket.username,
+      const msg = await Message.create({
+        fromId: socket.userId, fromName: socket.username,
         toId: toUserId, text: text || '',
-        file: file || null, // { url, originalName, mimeType, type }
-        createdAt: new Date().toISOString(), read: false
-      };
-      db.addMessage(message);
-      socket.emit('newMessage', message);
+        file: file || null
+      });
+      const out = { ...msg.toObject(), id: msg._id.toString() };
+      socket.emit('newMessage', out);
       const toSocketId = onlineUsers.get(toUserId);
-      if (toSocketId) io.to(toSocketId).emit('newMessage', message);
+      if (toSocketId) io.to(toSocketId).emit('newMessage', out);
     });
 
-    socket.on('markRead', ({ fromUserId }) => db.markRead(fromUserId, socket.userId));
+    socket.on('markRead', async ({ fromUserId }) => {
+      await Message.updateMany({ fromId: fromUserId, toId: socket.userId }, { read: true });
+    });
 
     socket.on('callUser', ({ toUserId, signal }) => {
       const toSocketId = onlineUsers.get(toUserId);
@@ -49,23 +56,23 @@ function setupSocket(io) {
     });
 
     socket.on('answerCall', ({ toUserId, signal }) => {
-      const toSocketId = onlineUsers.get(toUserId);
-      if (toSocketId) io.to(toSocketId).emit('callAccepted', { signal });
+      const s = onlineUsers.get(toUserId);
+      if (s) io.to(s).emit('callAccepted', { signal });
     });
 
     socket.on('rejectCall', ({ toUserId }) => {
-      const toSocketId = onlineUsers.get(toUserId);
-      if (toSocketId) io.to(toSocketId).emit('callRejected');
+      const s = onlineUsers.get(toUserId);
+      if (s) io.to(s).emit('callRejected');
     });
 
     socket.on('endCall', ({ toUserId }) => {
-      const toSocketId = onlineUsers.get(toUserId);
-      if (toSocketId) io.to(toSocketId).emit('callEnded');
+      const s = onlineUsers.get(toUserId);
+      if (s) io.to(s).emit('callEnded');
     });
 
     socket.on('iceCandidate', ({ toUserId, candidate }) => {
-      const toSocketId = onlineUsers.get(toUserId);
-      if (toSocketId) io.to(toSocketId).emit('iceCandidate', { candidate });
+      const s = onlineUsers.get(toUserId);
+      if (s) io.to(s).emit('iceCandidate', { candidate });
     });
 
     socket.on('disconnect', () => {
