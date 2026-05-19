@@ -617,7 +617,7 @@
   function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 
   function linkify(html) {
-    return html.replace(/(https?:\/\/[^\s&lt;&gt;"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all;">$1</a>');
+    return html.replace(/(https?:\/\/[^\s<"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all;">$1</a>');
   }
 
   // ========== 音声・ビデオ通話（Jitsi Meet） ==========
