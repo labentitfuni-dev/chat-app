@@ -200,6 +200,7 @@
     <div id="sidebar-header">
       <h2>💬 トーク</h2>
       <div id="header-btns">
+        <button id="notif-btn" title="通知を有効にする" onclick="requestNotifPermission()" style="display:none">🔔</button>
         <button id="install-btn" title="ホーム画面に追加">📲 追加</button>
         <button id="add-friend-btn" title="友達追加">＋</button>
         <button id="logout-btn">ログアウト</button>
@@ -850,38 +851,56 @@
   }
 
   // ========== プッシュ通知 ==========
+  async function subscribePush(reg) {
+    const keyRes = await fetch('/api/push/vapid-public-key');
+    const { key } = await keyRes.json();
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key)
+      });
+    }
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(sub)
+    });
+    $('notif-btn').style.display = 'none';
+  }
+
   async function registerPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
-      // SWを登録＆即座に最新版に更新
       const reg = await navigator.serviceWorker.register('/sw.js');
-      await reg.update(); // 新しいSWがあれば即更新
+      await reg.update();
       await navigator.serviceWorker.ready;
 
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return;
-
-      const keyRes = await fetch('/api/push/vapid-public-key');
-      const { key } = await keyRes.json();
-
-      // 既存の購読を確認
-      let sub = await reg.pushManager.getSubscription();
-      if (!sub) {
-        // 新規購読
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(key)
-        });
+      const perm = Notification.permission;
+      if (perm === 'granted') {
+        await subscribePush(reg);
+      } else if (perm === 'default') {
+        // 未決定 → ボタンを表示してユーザーに促す
+        $('notif-btn').style.display = 'inline-flex';
       }
-
-      // 毎回サーバーに登録（サーバー再起動後も即復活）
-      await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify(sub)
-      });
+      // 'denied' の場合は何もしない
     } catch (e) {
       console.log('Push通知の登録に失敗:', e.message);
+    }
+  }
+
+  async function requestNotifPermission() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('このブラウザはプッシュ通知に対応していません。\niOSの場合はホーム画面に追加してから開いてください。');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const reg = await navigator.serviceWorker.ready;
+      await subscribePush(reg);
+      showToast('通知を有効にしました');
+    } else {
+      showToast('通知が許可されませんでした');
     }
   }
 

@@ -29,19 +29,19 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
 
-  // 通話通知はJitsiのURLを直接開く
-  if (data.type === 'call' && data.jitsiUrl) {
-    event.waitUntil(clients.openWindow(data.jitsiUrl));
-    return;
-  }
+  const targetUrl = (data.type === 'call' && data.callUrl) ? data.callUrl : '/';
 
-  // メッセージ通知はアプリを開く
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      // 既に開いているウィンドウがあればそこに移動
       for (const c of list) {
-        if (c.url.includes(self.location.origin) && 'focus' in c) return c.focus();
+        if (c.url.includes(self.location.origin)) {
+          c.focus();
+          if (data.type === 'call') c.navigate(targetUrl);
+          return;
+        }
       }
-      return clients.openWindow('/');
+      return clients.openWindow(targetUrl);
     })
   );
 });

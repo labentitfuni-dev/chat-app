@@ -69,14 +69,14 @@ function setupSocket(io) {
       } else {
         socket.emit('callFailed', { reason: '相手はオフラインです' });
       }
-      // オフライン時もプッシュ通知（fallbackUrlがあればそちらを使う）
-      const pushUrl = signal?.fallbackUrl || signal?.jitsiUrl;
+      // バックグラウンドでもプッシュ通知（/callページのURLを使う）
+      const callUrl = signal?.jitsiUrl || signal?.fallbackUrl;
       sendPushNotification(toUserId, {
         title: `📞 ${socket.username} から着信`,
         body: 'タップして通話に参加してください',
         icon: '/icon.svg',
         badge: '/icon.svg',
-        data: { type: 'call', fromId: socket.userId, jitsiUrl: pushUrl }
+        data: { type: 'call', fromId: socket.userId, callUrl }
       });
     });
 
