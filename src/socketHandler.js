@@ -60,6 +60,11 @@ function setupSocket(io) {
 
     socket.on('markRead', async ({ fromUserId }) => {
       await Message.updateMany({ fromId: fromUserId, toId: socket.userId }, { read: true });
+      // 送信者に既読を通知
+      const fromSocketId = onlineUsers.get(fromUserId);
+      if (fromSocketId) {
+        io.to(fromSocketId).emit('messagesRead', { byUserId: socket.userId });
+      }
     });
 
     // ========== チャット画面の通話シグナリング ==========

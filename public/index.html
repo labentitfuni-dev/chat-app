@@ -552,8 +552,15 @@
   // ========== Socket ==========
   function connectSocket() {
     socket = io({ auth: { token } });
-    socket.on('userOnline', ({ userId }) => { onlineSet.add(userId); renderFriends(); });
-    socket.on('userOffline', ({ userId }) => { onlineSet.delete(userId); renderFriends(); });
+    socket.on('userOnline', ({ userId }) => { onlineSet.add(userId); });
+    socket.on('userOffline', ({ userId }) => { onlineSet.delete(userId); });
+    socket.on('messagesRead', ({ byUserId }) => {
+      // 相手が既読にしたら自分の送信メッセージをreadにして再描画
+      if (messages[byUserId]) {
+        messages[byUserId].forEach(m => { if (m.fromId === me.id) m.read = true; });
+        if (currentContact?.id === byUserId) renderMessages();
+      }
+    });
     socket.on('newMessage', onNewMessage);
     socket.on('incomingCall', onIncomingCall);
     socket.on('callAccepted', onCallAccepted);
@@ -647,17 +654,14 @@
 
   function renderFriends() {
     const makeItem = (u, onclick) => {
-      const online = onlineSet.has(u.id);
       const div = document.createElement('div');
       div.className = 'contact-item' + (currentContact?.id === u.id ? ' active' : '');
       div.innerHTML = `
         <div class="avatar" style="position:relative;background:${u.avatar?'transparent':'#06C755'}">
           ${u.avatar ? `<img src="${u.avatar}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.style.background='#06C755';this.parentElement.insertAdjacentText('afterbegin','${(u.displayName||u.username||'?')[0].toUpperCase()}')">` : (u.displayName||u.username||'?')[0].toUpperCase()}
-          ${online ? '<div class="online-dot"></div>' : ''}
         </div>
         <div class="contact-info">
           <div class="contact-name">${u.displayName || u.username}</div>
-          <div class="contact-status ${online?'online':''}">${online ? 'オンライン' : 'オフライン'}</div>
         </div>`;
       // アイコン4回タップで削除
       const avatarEl = div.querySelector('.avatar');
@@ -843,7 +847,11 @@
     renderFriends();
     if (!messages[contact.id]) messages[contact.id] = [];
     socket.emit('getMessages', { toUserId: contact.id });
-    socket.once('messageHistory', msgs => { messages[contact.id] = msgs; renderMessages(); });
+    socket.once('messageHistory', msgs => {
+      messages[contact.id] = msgs;
+      renderMessages();
+      socket.emit('markRead', { fromUserId: contact.id });
+    });
   }
 
   // ========== 通知音 ==========
@@ -892,7 +900,13 @@
       renderMessages();
     }
     // 自分のメッセージ以外は通知音
-    if (msg.fromId !== me.id) playNotifSound('message');
+    if (msg.fromId !== me.id) {
+      playNotifSound('message');
+      // チャットが開いていたら即既読
+      if (currentContact?.id === msg.fromId) {
+        socket.emit('markRead', { fromUserId: msg.fromId });
+      }
+    }
   }
 
   function renderMessages() {
@@ -916,7 +930,8 @@
         }
       }
       if (msg.text) content += `<span>${linkify(escapeHtml(msg.text))}</span>`;
-      row.innerHTML = `<div class="bubble ${isMine?'mine':'other'}">${content}<div class="msg-time">${time}</div></div>`;
+      const readLabel = (isMine && msg.read) ? '<span style="font-size:10px;color:#06C755;margin-right:4px">既読</span>' : '';
+      row.innerHTML = `<div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'}"><div class="bubble ${isMine?'mine':'other'}">${content}<div class="msg-time">${readLabel}${time}</div></div></div>`;
       box.appendChild(row);
     });
     box.scrollTop = box.scrollHeight;
