@@ -806,10 +806,30 @@
     };
   }
 
+  // オンライン状態だけ差分更新（全再描画しない）
+  function updateFriendOnlineDot(userId, isOnline) {
+    document.querySelectorAll(`[data-uid="${userId}"]`).forEach(item => {
+      const avatar = item.querySelector('.avatar');
+      const status = item.querySelector('.contact-status');
+      const existingDot = avatar?.querySelector('.online-dot');
+      if (isOnline && !existingDot && avatar) {
+        const dot = document.createElement('span');
+        dot.className = 'online-dot';
+        avatar.appendChild(dot);
+      } else if (!isOnline && existingDot) {
+        existingDot.remove();
+      }
+      if (status) {
+        status.classList.toggle('online', isOnline);
+      }
+    });
+  }
+
   function renderFriends() {
     const makeItem = (u, onclick) => {
       const div = document.createElement('div');
       div.className = 'contact-item' + (currentContact?.id === u.id ? ' active' : '');
+      div.dataset.uid = u.id;
       const isOnline = onlineSet.has(u.id);
       div.innerHTML = `
         <div class="avatar" style="position:relative;background:${u.avatar?'transparent':'#06C755'}">
@@ -1068,17 +1088,69 @@
     } catch {}
   }
 
+  // 1件分のメッセージ要素を生成（renderMessages / appendMessage 共用）
+  function buildMsgEl(msg, showRead) {
+    const isMine = msg.fromId === me.id;
+    const row = document.createElement('div');
+    row.className = 'msg-row ' + (isMine ? 'mine' : 'other');
+    const time = new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    let content = '';
+    if (msg.file) {
+      if (msg.file.type === 'image') {
+        content += `<img class="msg-image" src="${msg.file.url}" alt="${escapeHtml(msg.file.originalName)}" onclick="openImgModal('${msg.file.url}')">`;
+      } else if (msg.file.type === 'video') {
+        content += `<video controls style="max-width:220px;border-radius:12px;display:block;margin-bottom:4px"><source src="${msg.file.url}"></video>`;
+      } else {
+        const icon = getFileIcon(msg.file.mimeType);
+        const size = formatFileSize(msg.file.size);
+        content += `<a class="msg-file" href="${msg.file.url}" download="${escapeHtml(msg.file.originalName)}" target="_blank"><span class="msg-file-icon">${icon}</span><span class="msg-file-info"><span class="msg-file-name">${escapeHtml(msg.file.originalName)}</span><span class="msg-file-size">${size}</span></span></a>`;
+      }
+    }
+    if (msg.text) content += `<span>${linkify(escapeHtml(msg.text))}</span>`;
+    if (isMine) {
+      row.innerHTML = `
+        <div class="msg-meta">
+          ${showRead ? '<span class="msg-read">既読</span>' : ''}
+          <span class="msg-time-text">${time}</span>
+        </div>
+        <div class="bubble mine">${content}</div>`;
+      const wrap = document.createElement('div');
+      wrap.className = 'swipe-wrap';
+      const delBtn = document.createElement('button');
+      delBtn.className = 'msg-delete-btn';
+      delBtn.textContent = '削除';
+      delBtn.onclick = (e) => { e.stopPropagation(); doDeleteMessage(msg.id || msg._id?.toString(), wrap); };
+      wrap.appendChild(delBtn);
+      wrap.appendChild(row);
+      addSwipeDelete(row, wrap);
+      return wrap;
+    } else {
+      row.innerHTML = `
+        <div class="bubble other">${content}</div>
+        <div class="msg-meta">
+          <span class="msg-time-text">${time}</span>
+        </div>`;
+      return row;
+    }
+  }
+
   function onNewMessage(msg) {
     const partnerId = msg.fromId === me.id ? msg.toId : msg.fromId;
     if (!messages[partnerId]) messages[partnerId] = [];
-    if (!messages[partnerId].find(m => m.id === msg.id)) messages[partnerId].push(msg);
-    if (currentContact?.id === partnerId) {
-      renderMessages();
+    const msgId = msg.id || msg._id?.toString();
+    const dup = messages[partnerId].some(m => (m.id || m._id?.toString()) === msgId);
+    if (!dup) {
+      messages[partnerId].push(msg);
+      if (currentContact?.id === partnerId) {
+        // 全再描画せず末尾に追記するだけ
+        const box = $('messages');
+        const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+        box.appendChild(buildMsgEl(msg, false));
+        if (atBottom) box.scrollTop = box.scrollHeight;
+      }
     }
-    // 自分のメッセージ以外は通知音
     if (msg.fromId !== me.id) {
       playNotifSound('message');
-      // チャットが開いていたら即既読
       if (currentContact?.id === msg.fromId) {
         socket.emit('markRead', { fromUserId: msg.fromId });
       }
@@ -1087,64 +1159,30 @@
 
   function renderMessages() {
     const box = $('messages');
+    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    const prevTop = box.scrollTop;
+    const prevH = box.scrollHeight;
+
     box.innerHTML = '';
     const msgs = messages[currentContact?.id] || [];
 
-    // 自分が送った既読済みメッセージの中で最後のもののインデックスを探す（LINE方式）
     let lastReadIdx = -1;
     for (let i = msgs.length - 1; i >= 0; i--) {
       if (msgs[i].fromId === me.id && msgs[i].read) { lastReadIdx = i; break; }
     }
 
+    // DocumentFragment で一括挿入（リフロー最小化）
+    const frag = document.createDocumentFragment();
     msgs.forEach((msg, idx) => {
-      const isMine = msg.fromId === me.id;
-      const row = document.createElement('div');
-      row.className = 'msg-row ' + (isMine ? 'mine' : 'other');
-      const time = new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-      let content = '';
-      if (msg.file) {
-        if (msg.file.type === 'image') {
-          content += `<img class="msg-image" src="${msg.file.url}" alt="${escapeHtml(msg.file.originalName)}" onclick="openImgModal('${msg.file.url}')">`;
-        } else if (msg.file.type === 'video') {
-          content += `<video controls style="max-width:220px;border-radius:12px;display:block;margin-bottom:4px"><source src="${msg.file.url}"></video>`;
-        } else {
-          const icon = getFileIcon(msg.file.mimeType);
-          const size = formatFileSize(msg.file.size);
-          content += `<a class="msg-file" href="${msg.file.url}" download="${escapeHtml(msg.file.originalName)}" target="_blank"><span class="msg-file-icon">${icon}</span><span class="msg-file-info"><span class="msg-file-name">${escapeHtml(msg.file.originalName)}</span><span class="msg-file-size">${size}</span></span></a>`;
-        }
-      }
-      if (msg.text) content += `<span>${linkify(escapeHtml(msg.text))}</span>`;
-
-      // LINE方式：時刻・既読は吹き出しの外側（mine=左側、other=右側）
-      const showRead = isMine && idx === lastReadIdx;
-      if (isMine) {
-        row.innerHTML = `
-          <div class="msg-meta">
-            ${showRead ? '<span class="msg-read">既読</span>' : ''}
-            <span class="msg-time-text">${time}</span>
-          </div>
-          <div class="bubble mine">${content}</div>`;
-        // スワイプで削除できるようにラップ
-        const wrap = document.createElement('div');
-        wrap.className = 'swipe-wrap';
-        const delBtn = document.createElement('button');
-        delBtn.className = 'msg-delete-btn';
-        delBtn.textContent = '削除';
-        delBtn.onclick = (e) => { e.stopPropagation(); doDeleteMessage(msg.id || msg._id?.toString(), wrap); };
-        wrap.appendChild(delBtn);
-        wrap.appendChild(row);
-        addSwipeDelete(row, wrap);
-        box.appendChild(wrap);
-      } else {
-        row.innerHTML = `
-          <div class="bubble other">${content}</div>
-          <div class="msg-meta">
-            <span class="msg-time-text">${time}</span>
-          </div>`;
-        box.appendChild(row);
-      }
+      frag.appendChild(buildMsgEl(msg, msg.fromId === me.id && idx === lastReadIdx));
     });
-    box.scrollTop = box.scrollHeight;
+    box.appendChild(frag);
+
+    if (atBottom || prevH === 0) {
+      box.scrollTop = box.scrollHeight;
+    } else {
+      box.scrollTop = prevTop + (box.scrollHeight - prevH);
+    }
   }
 
   function getFileIcon(mime) {
@@ -1824,10 +1862,17 @@
     showOfflineBar('📵 オフライン — 接続を確認しています', false);
   });
 
+  // fetchFriends のデバウンス（短時間に何度も呼ばれても1回だけ実行）
+  let _fetchTimer = null;
+  function debouncedFetchFriends(delay = 400) {
+    clearTimeout(_fetchTimer);
+    _fetchTimer = setTimeout(fetchFriends, delay);
+  }
+
   window.addEventListener('online', () => {
     showOfflineBar('✅ 接続が回復しました', true);
     if (socket && !socket.connected) socket.connect();
-    if (me) fetchFriends();
+    if (me) debouncedFetchFriends();
   });
 
   // バックグラウンドから復帰したとき（iOS PWA 対応）
@@ -1835,7 +1880,7 @@
     if (document.visibilityState !== 'visible') return;
     if (!me) return;
     if (socket && !socket.connected) socket.connect();
-    fetchFriends();
+    // 友達一覧はソケット reconnect 時に更新されるので不要。現チャットだけ更新
     if (currentContact && socket?.connected) {
       socket.emit('getMessages', { toUserId: currentContact.id });
       const targetId = currentContact.id;
@@ -1850,7 +1895,7 @@
   // ソケット再接続後に状態を更新
   function connectSocket() {
     if (socket) { socket.disconnect(); socket = null; }
-    socket = io({ auth: { token } });
+    socket = io({ auth: { token }, transports: ['websocket'] });
     socket.on('connect_error', (err) => {
       if (err.message === 'トークンが無効です' || err.message === '認証が必要です') {
         localStorage.removeItem('token');
@@ -1858,9 +1903,11 @@
         location.reload();
       }
     });
+    let _isFirstConnect = true;
     socket.on('connect', () => {
-      // 再接続後に友達一覧とメッセージを更新
-      fetchFriends();
+      if (_isFirstConnect) { _isFirstConnect = false; return; } // 初回はstartApp側で取得済み
+      // 再接続時のみ友達一覧とメッセージを更新
+      debouncedFetchFriends();
       if (currentContact) {
         socket.emit('getMessages', { toUserId: currentContact.id });
         const targetId = currentContact.id;
@@ -1871,8 +1918,8 @@
         });
       }
     });
-    socket.on('userOnline', ({ userId }) => { onlineSet.add(userId); renderFriends(); });
-    socket.on('userOffline', ({ userId }) => { onlineSet.delete(userId); renderFriends(); });
+    socket.on('userOnline', ({ userId }) => { onlineSet.add(userId); updateFriendOnlineDot(userId, true); });
+    socket.on('userOffline', ({ userId }) => { onlineSet.delete(userId); updateFriendOnlineDot(userId, false); });
     socket.on('messagesRead', ({ byUserId }) => {
       if (messages[byUserId]) {
         messages[byUserId].forEach(m => { if (m.fromId === me.id) m.read = true; });
