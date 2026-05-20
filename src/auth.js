@@ -142,4 +142,66 @@ router.post('/avatar', async (req, res) => {
   } catch { res.status(401).json({ error: 'トークンが無効です' }); }
 });
 
+router.get('/config', (req, res) => {
+  res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID || '' });
+});
+
+router.post('/google', async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) return res.status(400).json({ error: 'credentialが必要です' });
+
+    // Google tokeninfo エンドポイントでトークンを検証
+    const resp = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+    if (!resp.ok) return res.status(401).json({ error: 'Googleトークンが無効です' });
+    const payload = await resp.json();
+
+    if (!payload.sub) return res.status(401).json({ error: 'Googleトークンが無効です' });
+
+    const googleId = payload.sub;
+    const email = payload.email || '';
+    const googleName = payload.name || email.split('@')[0] || 'User';
+    const googleAvatar = payload.picture || '';
+
+    // 既存ユーザーを googleId で検索
+    let user = await User.findOne({ googleId });
+
+    if (!user) {
+      // メールアドレスで既存ユーザーを検索して紐づけ
+      if (email) user = await User.findOne({ username: email });
+    }
+
+    if (user) {
+      // googleId を紐づけ（まだなければ）
+      if (!user.googleId) {
+        await User.findByIdAndUpdate(user._id, { googleId });
+        user.googleId = googleId;
+      }
+    } else {
+      // 新規ユーザー作成
+      let baseUsername = email ? email.split('@')[0] : googleName.replace(/\s+/g, '').toLowerCase();
+      let username = baseUsername;
+      let suffix = 1;
+      while (await User.findOne({ username })) {
+        username = baseUsername + suffix++;
+      }
+      user = await User.create({
+        username,
+        displayName: googleName,
+        password: null,
+        googleId,
+        avatar: googleAvatar,
+        friendCode: await generateFriendCode(),
+        friends: []
+      });
+    }
+
+    const token = jwt.sign({ id: user._id.toString(), username: user.username }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: safeUser(user) });
+  } catch (e) {
+    console.error('google auth error:', e.message);
+    res.status(500).json({ error: 'エラーが発生しました' });
+  }
+});
+
 module.exports = router;

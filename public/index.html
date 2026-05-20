@@ -137,6 +137,12 @@
 
     /* ログイン画面のインストール誘導バナー */
     #login-install-bar { display: none; background: #06C755; color: white; padding: 12px 16px; text-align: center; font-size: 14px; font-weight: bold; cursor: pointer; border-radius: 10px; margin-bottom: 16px; }
+    /* Googleログインボタン */
+    .google-divider { display: flex; align-items: center; gap: 8px; margin: 12px 0; color: #aaa; font-size: 13px; }
+    .google-divider::before, .google-divider::after { content: ''; flex: 1; height: 1px; background: #e0e0e0; }
+    .btn-google { width: 100%; padding: 12px; background: white; color: #333; border: 1.5px solid #ddd; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 4px; }
+    .btn-google:hover { background: #f8f8f8; border-color: #bbb; }
+    .btn-google svg { flex-shrink: 0; }
 
     /* モーダル共通 */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; }
@@ -175,6 +181,9 @@
     .call-btn.reject, .call-btn.end { background: #e53935; }
     /* トースト */
     #toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.75); color: white; padding: 10px 22px; border-radius: 20px; font-size: 14px; display: none; z-index: 500; white-space: nowrap; }
+    /* オフラインバナー */
+    #offline-bar { display: none; position: fixed; top: 0; left: 0; right: 0; background: #e53935; color: white; text-align: center; font-size: 13px; font-weight: 600; padding: 6px; z-index: 600; }
+    #offline-bar.online { background: #06C755; }
 
     #back-btn { display: none; background: none; border: none; color: white; font-size: 22px; cursor: pointer; padding: 4px 8px; }
 
@@ -247,6 +256,11 @@
       <button type="button" class="btn-green" id="auth-btn" onclick="doAuth()">ログイン</button>
     </form>
     <p class="switch-link" id="switch-link">アカウントを作成する →</p>
+    <div class="google-divider">または</div>
+    <button class="btn-google" id="google-btn" onclick="startGoogleLogin()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+      Googleでログイン
+    </button>
   </div>
 </div>
 
@@ -435,6 +449,9 @@
   </div>
 </div>
 
+<!-- オフラインバナー -->
+<div id="offline-bar"></div>
+
 <!-- トースト通知 -->
 <div id="toast"></div>
 
@@ -442,37 +459,36 @@
 <div id="install-guide-modal" onclick="if(event.target===this)closeInstallGuide()">
   <div id="install-guide-box">
     <h3>📲 ホーム画面に追加</h3>
-    <p class="ig-sub" id="ig-subtitle">アプリのようにすぐ開けます</p>
+    <p class="ig-sub">アプリとしてすぐ起動できます</p>
     <div id="ig-steps-ios">
       <div class="ig-step">
         <div class="ig-num">1</div>
-        <span class="ig-icon">🧭</span>
-        <div class="ig-text"><strong>Safari</strong> でこのページを開く<br><span style="color:#888;font-size:13px">LINEやWhatsAppのブラウザからは追加できません</span></div>
+        <div class="ig-text">
+          画面下の
+          <svg style="vertical-align:middle;margin:0 2px" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          <strong>共有ボタン</strong> をタップ
+        </div>
       </div>
       <div class="ig-step">
         <div class="ig-num">2</div>
-        <span class="ig-icon">⬆️</span>
-        <div class="ig-text">画面下の <strong>共有ボタン</strong>（四角と矢印のマーク）をタップ</div>
+        <div class="ig-text">「<strong>ホーム画面に追加</strong>」➕ をタップして完了！</div>
       </div>
-      <div class="ig-step">
-        <div class="ig-num">3</div>
-        <span class="ig-icon">➕</span>
-        <div class="ig-text"><strong>「ホーム画面に追加」</strong> をタップして完了</div>
+      <div id="ig-inapp-note" style="display:none;background:#fff8e1;border-radius:10px;padding:12px;margin-top:8px;font-size:13px;color:#666;line-height:1.5">
+        ⚠️ LINEやアプリ内ブラウザでは追加できません。<br>
+        <strong>Safari</strong> でこのページを開いてください。
       </div>
     </div>
     <div id="ig-steps-android" style="display:none">
       <div class="ig-step">
         <div class="ig-num">1</div>
-        <span class="ig-icon">⋮</span>
-        <div class="ig-text">ブラウザ右上の <strong>メニュー（⋮）</strong> をタップ</div>
+        <div class="ig-text">ブラウザ右上の <strong>⋮ メニュー</strong> をタップ</div>
       </div>
       <div class="ig-step">
         <div class="ig-num">2</div>
-        <span class="ig-icon">➕</span>
-        <div class="ig-text"><strong>「ホーム画面に追加」</strong> をタップして完了</div>
+        <div class="ig-text">「<strong>ホーム画面に追加</strong>」をタップして完了！</div>
       </div>
     </div>
-    <button id="install-guide-safari-btn" onclick="openInSafari()">Safariで開く</button>
+    <button id="install-guide-safari-btn" onclick="openInSafari()">🧭 Safariで開く</button>
     <button id="install-guide-close" onclick="closeInstallGuide()">閉じる</button>
   </div>
 </div>
@@ -529,6 +545,46 @@
     }
   }
   function showError(msg) { $('error-msg').textContent = msg; }
+
+  // ========== Googleログイン ==========
+  let googleClientId = '';
+  fetch('/api/auth/config').then(r => r.json()).then(d => { googleClientId = d.googleClientId || ''; }).catch(() => {});
+
+  function startGoogleLogin() {
+    if (!googleClientId) { showError('Google連携が設定されていません'); return; }
+    const width = 500, height = 600;
+    const left = Math.max(0, (screen.width - width) / 2);
+    const top = Math.max(0, (screen.height - height) / 2);
+    const popup = window.open(
+      `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(location.origin + '/google-callback')}&response_type=id_token&scope=openid%20email%20profile&nonce=${Math.random().toString(36).slice(2)}`,
+      'google-login',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+    if (!popup) { showError('ポップアップがブロックされました。許可してください'); return; }
+    window._googlePopup = popup;
+  }
+
+  async function handleGoogleCredential(credential) {
+    $('error-msg').textContent = '';
+    $('google-btn').disabled = true;
+    $('google-btn').textContent = '処理中...';
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential })
+      });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Googleログインに失敗しました'); return; }
+      token = data.token; me = data.user;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(me));
+      startApp();
+    } catch { showError('サーバーに接続できません'); }
+    finally {
+      $('google-btn').disabled = false;
+      $('google-btn').innerHTML = `<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg> Googleでログイン`;
+    }
+  }
 
   // ========== アプリ起動 ==========
   function startApp() {
@@ -615,64 +671,25 @@
   $('settings-btn').onclick = openSettings;
 
   $('copy-code-btn').onclick = () => {
-    navigator.clipboard.writeText(me.friendCode).then(() => {
-      $('copy-code-btn').textContent = '✓';
-      setTimeout(() => $('copy-code-btn').textContent = 'コピー', 1500);
-    });
+    const code = me.friendCode;
+    const btn = $('copy-code-btn');
+    const done = () => { btn.textContent = '✓'; setTimeout(() => btn.textContent = 'コピー', 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(done).catch(() => {
+        fallbackCopy(code); done();
+      });
+    } else { fallbackCopy(code); done(); }
   };
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch {}
+    document.body.removeChild(ta);
+  }
 
   // ========== Socket ==========
-  function connectSocket() {
-    if (socket) { socket.disconnect(); socket = null; }
-    socket = io({ auth: { token } });
-    socket.on('connect_error', (err) => {
-      if (err.message === 'トークンが無効です' || err.message === '認証が必要です') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        location.reload();
-      }
-    });
-    socket.on('userOnline', ({ userId }) => { onlineSet.add(userId); });
-    socket.on('userOffline', ({ userId }) => { onlineSet.delete(userId); });
-    socket.on('messagesRead', ({ byUserId }) => {
-      // 相手が既読にしたら自分の送信メッセージをreadにして再描画
-      if (messages[byUserId]) {
-        messages[byUserId].forEach(m => { if (m.fromId === me.id) m.read = true; });
-        if (currentContact?.id === byUserId) renderMessages();
-      }
-    });
-    socket.on('newMessage', onNewMessage);
-    socket.on('incomingCall', onIncomingCall);
-    socket.on('callAccepted', onCallAccepted);
-    socket.on('callRejected', () => { clearCallTimeout(); closeCallModal(); showToast('📵 相手が拒否しました'); });
-    socket.on('callEnded', () => { closeCallModal(); showToast('通話終了'); });
-    socket.on('callFailed', ({ reason }) => {
-      clearCallTimeout();
-      // closeCallModal の前に保存（closeCallModal が currentCallContact を null にするため）
-      const jitsiUrl = currentJitsiUrl;
-      const callContact = currentCallContact;
-      closeCallModal();
-      if (jitsiUrl && callContact) {
-        // チャットにURLを送る
-        socket.emit('sendMessage', {
-          toUserId: callContact.id,
-          text: `📞 通話リクエスト（タップして参加）\n${jitsiUrl}`,
-          file: null
-        });
-        // window.open はポップアップブロックされるのでボタンで開かせる
-        showCallModal(callContact, 'オフラインのため通知を送りました', [
-          { label: '📞 通話を開始', cls: 'accept', fn: () => { closeCallModal(); window.open(jitsiUrl, '_blank'); }},
-          { label: '閉じる', cls: 'end', fn: closeCallModal }
-        ]);
-        currentJitsiUrl = null;
-      } else {
-        showToast('📵 ' + (reason || '相手はオフラインです'));
-      }
-    });
-    socket.on('iceCandidate', async ({ candidate }) => {
-      if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
-    });
-  }
+  // connectSocket は下部のネットワーク・可視性セクションで定義
 
   // ========== 友達一覧 ==========
   async function fetchFriends() {
@@ -739,12 +756,15 @@
     const makeItem = (u, onclick) => {
       const div = document.createElement('div');
       div.className = 'contact-item' + (currentContact?.id === u.id ? ' active' : '');
+      const isOnline = onlineSet.has(u.id);
       div.innerHTML = `
         <div class="avatar" style="position:relative;background:${u.avatar?'transparent':'#06C755'}">
           ${u.avatar ? `<img src="${u.avatar}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.style.background='#06C755';this.parentElement.insertAdjacentText('afterbegin','${(u.displayName||u.username||'?')[0].toUpperCase()}')">` : (u.displayName||u.username||'?')[0].toUpperCase()}
+          ${isOnline ? '<span class="online-dot"></span>' : ''}
         </div>
         <div class="contact-info">
           <div class="contact-name">${u.displayName || u.username}</div>
+          <div class="contact-status${isOnline?' online':''}"></div>
         </div>`;
       // アイコン4回タップで削除
       const avatarEl = div.querySelector('.avatar');
@@ -929,11 +949,14 @@
     if (isMobile()) { $('sidebar').classList.add('hidden'); $('chat-panel').classList.add('show'); }
     renderFriends();
     if (!messages[contact.id]) messages[contact.id] = [];
+    if (!socket?.connected) { renderMessages(); return; }
     socket.emit('getMessages', { toUserId: contact.id });
+    const targetId = contact.id;
     socket.once('messageHistory', msgs => {
-      messages[contact.id] = msgs;
+      if (currentContact?.id !== targetId) return;
+      messages[targetId] = msgs;
       renderMessages();
-      socket.emit('markRead', { fromUserId: contact.id });
+      socket.emit('markRead', { fromUserId: targetId });
     });
   }
 
@@ -1081,7 +1104,8 @@
   async function sendMessage() {
     const text = $('msg-input').value.trim();
     if (!text && !pendingFile) return;
-    if (!currentContact || !socket) return;
+    if (!currentContact) return;
+    if (!socket?.connected) { showToast('⚠️ 接続中です。しばらく待ってください'); return; }
 
     let fileData = null;
     if (pendingFile) {
@@ -1095,15 +1119,18 @@
           headers: { Authorization: 'Bearer ' + token },
           body: formData
         });
+        if (!res.ok) throw new Error('upload failed');
         fileData = await res.json();
       } catch {
-        alert('ファイルのアップロードに失敗しました');
+        showToast('ファイルのアップロードに失敗しました');
         return;
       } finally {
         $('send-btn').textContent = '送信';
         $('send-btn').disabled = false;
       }
       pendingFile = null;
+      const img = $('file-preview-img');
+      if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
       $('file-preview-bar').style.display = 'none';
     }
 
@@ -1290,12 +1317,16 @@
   // SW: ページ読み込み時に即登録・更新チェック、30分ごとに定期チェック
   let _swReg = null;
   if ('serviceWorker' in navigator) {
+    let swReloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (swReloading) return;
+      swReloading = true;
       window.location.reload();
     });
     navigator.serviceWorker.register('/sw.js').then(reg => {
       _swReg = reg;
-      reg.update();
+      // 初回登録直後のcontrollerchangeではリロードしないよう少し待つ
+      setTimeout(() => reg.update(), 1000);
       setInterval(() => reg.update(), 30 * 60 * 1000);
     }).catch(() => {});
   }
@@ -1323,7 +1354,7 @@
 
   async function requestNotifPermission() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      alert('このブラウザはプッシュ通知に対応していません。\niOSの場合はホーム画面に追加してから開いてください。');
+      showToast('iOSはホーム画面に追加してから通知を許可できます');
       return;
     }
     const permission = await Notification.requestPermission();
@@ -1438,29 +1469,18 @@
 
   // ========== インストールガイドモーダル ==========
   function showInstallGuide() {
-    const modal = $('install-guide-modal');
-    const iosSteps = $('ig-steps-ios');
-    const androidSteps = $('ig-steps-android');
-    const safariBtn = $('install-guide-safari-btn');
-
-    if (isIos()) {
-      iosSteps.style.display = 'block';
-      androidSteps.style.display = 'none';
-      // LINE/WhatsApp内蔵ブラウザからはSafariで開くボタンを表示
-      safariBtn.style.display = isInAppBrowser() ? 'block' : 'none';
-    } else {
-      iosSteps.style.display = 'none';
-      androidSteps.style.display = 'block';
-      safariBtn.style.display = 'none';
-      // Androidはネイティブプロンプトを優先
-      if (deferredInstallPrompt) {
-        closeInstallGuide();
-        deferredInstallPrompt.prompt();
-        deferredInstallPrompt.userChoice.then(r => { if (r.outcome === 'accepted') deferredInstallPrompt = null; });
-        return;
-      }
+    // Android: ネイティブプロンプトが使えるなら即表示（モーダル不要）
+    if (!isIos() && deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then(r => { if (r.outcome === 'accepted') deferredInstallPrompt = null; });
+      return;
     }
-    modal.style.display = 'flex';
+    const inApp = isInAppBrowser();
+    $('ig-steps-ios').style.display = isIos() ? 'block' : 'none';
+    $('ig-steps-android').style.display = isIos() ? 'none' : 'block';
+    $('ig-inapp-note').style.display = (isIos() && inApp) ? 'block' : 'none';
+    $('install-guide-safari-btn').style.display = (isIos() && inApp) ? 'block' : 'none';
+    $('install-guide-modal').style.display = 'flex';
   }
 
   function closeInstallGuide() {
@@ -1472,6 +1492,15 @@
     const safariUrl = location.href.replace(/^https:\/\//, 'x-safari-https://');
     location.href = safariUrl;
   }
+
+  // Googleログイン popup からの callback を受信
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin) return;
+    if (e.data && e.data.type === 'google-credential') {
+      if (window._googlePopup) { try { window._googlePopup.close(); } catch(ex) {} }
+      handleGoogleCredential(e.data.credential);
+    }
+  });
 
   // Android: beforeinstallprompt をキャプチャ
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -1509,6 +1538,109 @@
       $('login-install-bar').style.display = 'block';
     }
   })();
+
+  // ========== ネットワーク・可視性 ==========
+  let offlineBarTimer = null;
+
+  function showOfflineBar(msg, isOnline) {
+    const bar = $('offline-bar');
+    bar.textContent = msg;
+    bar.className = isOnline ? 'online' : '';
+    bar.style.display = 'block';
+    clearTimeout(offlineBarTimer);
+    if (isOnline) {
+      offlineBarTimer = setTimeout(() => { bar.style.display = 'none'; }, 2500);
+    }
+  }
+
+  window.addEventListener('offline', () => {
+    showOfflineBar('📵 オフライン — 接続を確認しています', false);
+  });
+
+  window.addEventListener('online', () => {
+    showOfflineBar('✅ 接続が回復しました', true);
+    if (socket && !socket.connected) socket.connect();
+    if (me) fetchFriends();
+  });
+
+  // バックグラウンドから復帰したとき（iOS PWA 対応）
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (!me) return;
+    if (socket && !socket.connected) socket.connect();
+    fetchFriends();
+    if (currentContact && socket?.connected) {
+      socket.emit('getMessages', { toUserId: currentContact.id });
+      const targetId = currentContact.id;
+      socket.once('messageHistory', msgs => {
+        if (currentContact?.id !== targetId) return;
+        messages[targetId] = msgs;
+        renderMessages();
+      });
+    }
+  });
+
+  // ソケット再接続後に状態を更新
+  function connectSocket() {
+    if (socket) { socket.disconnect(); socket = null; }
+    socket = io({ auth: { token } });
+    socket.on('connect_error', (err) => {
+      if (err.message === 'トークンが無効です' || err.message === '認証が必要です') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        location.reload();
+      }
+    });
+    socket.on('connect', () => {
+      // 再接続後に友達一覧とメッセージを更新
+      fetchFriends();
+      if (currentContact) {
+        socket.emit('getMessages', { toUserId: currentContact.id });
+        const targetId = currentContact.id;
+        socket.once('messageHistory', msgs => {
+          if (currentContact?.id !== targetId) return;
+          messages[targetId] = msgs;
+          renderMessages();
+        });
+      }
+    });
+    socket.on('userOnline', ({ userId }) => { onlineSet.add(userId); renderFriends(); });
+    socket.on('userOffline', ({ userId }) => { onlineSet.delete(userId); renderFriends(); });
+    socket.on('messagesRead', ({ byUserId }) => {
+      if (messages[byUserId]) {
+        messages[byUserId].forEach(m => { if (m.fromId === me.id) m.read = true; });
+        if (currentContact?.id === byUserId) renderMessages();
+      }
+    });
+    socket.on('newMessage', onNewMessage);
+    socket.on('incomingCall', onIncomingCall);
+    socket.on('callAccepted', onCallAccepted);
+    socket.on('callRejected', () => { clearCallTimeout(); closeCallModal(); showToast('📵 相手が拒否しました'); });
+    socket.on('callEnded', () => { closeCallModal(); showToast('通話終了'); });
+    socket.on('callFailed', ({ reason }) => {
+      clearCallTimeout();
+      const jitsiUrl = currentJitsiUrl;
+      const callContact = currentCallContact;
+      closeCallModal();
+      if (jitsiUrl && callContact) {
+        socket.emit('sendMessage', {
+          toUserId: callContact.id,
+          text: `📞 通話リクエスト（タップして参加）\n${jitsiUrl}`,
+          file: null
+        });
+        showCallModal(callContact, 'オフラインのため通知を送りました', [
+          { label: '📞 通話を開始', cls: 'accept', fn: () => { closeCallModal(); window.open(jitsiUrl, '_blank'); }},
+          { label: '閉じる', cls: 'end', fn: closeCallModal }
+        ]);
+        currentJitsiUrl = null;
+      } else {
+        showToast('📵 ' + (reason || '相手はオフラインです'));
+      }
+    });
+    socket.on('iceCandidate', async ({ candidate }) => {
+      if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+  }
 
   $('ios-banner-close').onclick = () => {
     $('ios-install-banner').style.display = 'none';

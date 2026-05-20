@@ -25,6 +25,11 @@ app.get('/call', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'call.html'));
 });
 
+app.get('/google-callback', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '..', 'public', 'google-callback.html'));
+});
+
 // sw.js は絶対にキャッシュさせない
 app.get('/sw.js', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');

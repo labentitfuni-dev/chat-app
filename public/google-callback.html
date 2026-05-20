@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Google Login</title></head>
+<body>
+<script>
+  try {
+    const hash = location.hash.slice(1);
+    const params = new URLSearchParams(hash);
+    const idToken = params.get('id_token');
+    if (idToken && window.opener) {
+      window.opener.postMessage({ type: 'google-credential', credential: idToken }, location.origin);
+    }
+  } catch(e) {}
+  window.close();
+</script>
+</body>
+</html>
