@@ -116,7 +116,7 @@
       </div>
 
       <div class="btn-wrap">
-        <button class="btn btn-speaker" id="speaker-btn" onclick="enableAudio()">
+        <button class="btn btn-speaker" id="speaker-btn" onclick="toggleSpeaker()">
           <!-- スピーカー -->
           <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
             <polygon points="11,5 6,9 2,9 2,15 6,15 11,19"/>
@@ -124,7 +124,7 @@
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
           </svg>
         </button>
-        <span class="btn-label">音声ON</span>
+        <span class="btn-label" id="speaker-label">スピーカー</span>
       </div>
     </div>
   </div>
@@ -181,35 +181,59 @@
     }
 
     let pc = null, localStream = null;
-    let isMuted = false, isSpeakerOn = true;
+    let isMuted = false, isSpeakerOn = false;
     let timerSec = 0, timerInterval = null;
     let timerStarted = false;
-    let _audioCtx = null;  // AudioContext（スピーカー出力用）
+    let _audioCtx = null, _speakerSource = null;
 
     const $ = id => document.getElementById(id);
 
-    // AudioContext を生成・再開（iOSスピーカー出力のため維持する）
-    function getAudioCtx() {
-      if (!_audioCtx) {
-        try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+    // ========== マイク事前取得（ページ読み込み直後に一度だけ許可を取る） ==========
+    // initPC()はSocket経由（非ユーザー操作）で呼ばれるため、ここで先に取得しておく
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      .then(stream => {
+        localStream = stream;
+        $('local-audio').srcObject = stream;
+      })
+      .catch(() => {
+        showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してから\nもう一度お試しください。');
+      });
+
+    // ========== スピーカー切替 ==========
+    // ユーザーのタップ（= ユーザージェスチャー）の中でAudioContextを同期的に作成・接続する
+    function toggleSpeaker() {
+      isSpeakerOn = !isSpeakerOn;
+      $('speaker-btn').classList.toggle('active', isSpeakerOn);
+      $('speaker-label').textContent = isSpeakerOn ? 'スピーカーON' : 'スピーカー';
+
+      if (isSpeakerOn) {
+        // AudioContextをユーザージェスチャー内で同期的に作成（iOS要件）
+        if (!_audioCtx || _audioCtx.state === 'closed') {
+          try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+        }
+        if (_audioCtx) _audioCtx.resume().catch(() => {});
+
+        const audio = $('remote-audio');
+        if (audio.srcObject && _audioCtx) {
+          // 既存ソースを切断してから新規接続
+          if (_speakerSource) { try { _speakerSource.disconnect(); } catch {} }
+          try {
+            _speakerSource = _audioCtx.createMediaStreamSource(audio.srcObject);
+            _speakerSource.connect(_audioCtx.destination);
+          } catch {}
+        }
+        // audio要素はミュートして二重再生を防ぐ（AudioContext側で鳴らす）
+        $('remote-audio').muted = true;
+        $('audio-banner').style.display = 'none';
+      } else {
+        // スピーカーOFF：AudioContextを切断してaudio要素に戻す
+        if (_speakerSource) { try { _speakerSource.disconnect(); } catch {} _speakerSource = null; }
+        if (_audioCtx) { try { _audioCtx.suspend(); } catch {} }
+        $('remote-audio').muted = false;
       }
-      if (_audioCtx && _audioCtx.state !== 'running') {
-        _audioCtx.resume().catch(() => {});
-      }
-      return _audioCtx;
     }
 
-    // AudioContextを通してリモート音声をスピーカーに出力（iOS PWAでイヤピースでなくスピーカーから聞こえるようにする）
-    function routeAudioToSpeaker(stream) {
-      try {
-        const ctx = getAudioCtx();
-        if (!ctx) return;
-        const src = ctx.createMediaStreamSource(stream);
-        src.connect(ctx.destination);
-      } catch {}
-    }
-
-    // ページ読み込み時に音声バナーを表示してユーザーに早めにタップしてもらう
+    // ページ読み込み時に音声バナーを表示
     $('audio-banner').style.display = 'flex';
 
     // ---- Socket ----
@@ -262,12 +286,15 @@
 
     // ---- WebRTC ----
     async function initPC() {
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        $('local-audio').srcObject = localStream;
-      } catch {
-        showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してから\nもう一度お試しください。');
-        throw new Error('mic denied');
+      // ページ読み込み時に取得済みのstreamを再利用（getUserMedia二重呼び出し＝毎回許可ダイアログを防ぐ）
+      if (!localStream) {
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          $('local-audio').srcObject = localStream;
+        } catch {
+          showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してから\nもう一度お試しください。');
+          throw new Error('mic denied');
+        }
       }
 
       pc = new RTCPeerConnection(iceConfig);
@@ -278,9 +305,15 @@
         const stream = e.streams[0] || new MediaStream([e.track]);
         audio.srcObject = stream;
         audio.volume = 1;
-        audio.muted = false;
-        // iOSでスピーカー出力するためAudioContext経由でルーティング
-        routeAudioToSpeaker(stream);
+        audio.muted = isSpeakerOn; // スピーカーON中はaudio要素をミュート
+        // スピーカーモードがすでにONなら再接続
+        if (isSpeakerOn && _audioCtx && _audioCtx.state === 'running') {
+          if (_speakerSource) { try { _speakerSource.disconnect(); } catch {} }
+          try {
+            _speakerSource = _audioCtx.createMediaStreamSource(stream);
+            _speakerSource.connect(_audioCtx.destination);
+          } catch {}
+        }
         tryPlayAudio(audio);
         onCallConnected();
       };
@@ -301,46 +334,33 @@
     }
 
     function tryPlayAudio(audio) {
-      // ユーザーがバナーをタップしてAudioContextが生きていれば直接スピーカー出力で再生
-      const ctx = getAudioCtx();
-      if (ctx && ctx.state === 'running' && audio.srcObject) {
-        routeAudioToSpeaker(audio.srcObject);
-      }
+      if (isSpeakerOn) return; // スピーカーON時はAudioContext側で再生するのでskip
       audio.play().then(() => {
         $('audio-banner').style.display = 'none';
-        $('speaker-btn').classList.add('active');
       }).catch(() => {
         $('audio-banner').style.display = 'flex';
       });
     }
 
+    // 音声バナーのタップ：autoplay制限を解除してaudio要素で再生開始
     function enableAudio() {
-      // ★ audio.play() はユーザージェスチャーのコールスタック内で同期的に呼ぶ（iOSの制限）
-      // Promise.then() の中で呼ぶとジェスチャーが切れてブロックされる
-      getAudioCtx();  // AudioContextを作成・resume（スピーカー出力のため保持）
-
-      const audio = $('remote-audio');
       $('audio-banner').style.display = 'none';
-      $('speaker-btn').classList.add('active');
-
-      if (audio.srcObject) {
-        routeAudioToSpeaker(audio.srcObject);  // iOS: AudioContext経由でスピーカーへ
+      const audio = $('remote-audio');
+      if (!isSpeakerOn) {
         audio.muted = false;
         audio.volume = 1;
+        // play()はユーザージェスチャー内で同期的に呼ぶ（iOSの制限）
         const p = audio.play();
         if (p) p.catch(() => {});
       }
     }
 
-    // 画面のどこをタップしても音声有効化を試みる
+    // 画面タップでも音声再生を試みる
     document.addEventListener('touchstart', () => {
-      getAudioCtx();  // AudioContextをアンロック
       const audio = $('remote-audio');
-      if (audio.srcObject && audio.paused) {
-        routeAudioToSpeaker(audio.srcObject);
+      if (!isSpeakerOn && audio.srcObject && audio.paused) {
         audio.play().then(() => {
           $('audio-banner').style.display = 'none';
-          $('speaker-btn').classList.add('active');
         }).catch(() => {});
       }
     }, { passive: true });

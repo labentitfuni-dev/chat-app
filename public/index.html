@@ -110,15 +110,15 @@
     #no-chat { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #aaa; gap: 12px; }
     #no-chat-add { background: #06C755; color: white; border: none; border-radius: 20px; padding: 10px 20px; font-size: 14px; cursor: pointer; }
     #messages { flex: 1; overflow-y: auto; padding: 16px; background: #e8f5e9; display: none; flex-direction: column; gap: 6px; }
-    .msg-row { display: flex; }
-    .msg-row.mine { justify-content: flex-end; }
-    .bubble { max-width: 65%; padding: 8px 14px; border-radius: 18px; font-size: 15px; line-height: 1.4; }
+    /* LINE方式：時刻・既読は吹き出しの外側に表示 */
+    .msg-row { display: flex; align-items: flex-end; gap: 5px; }
+    .msg-row.mine { flex-direction: row-reverse; } /* 自分のメッセージは右側 */
+    .bubble { max-width: 72%; padding: 9px 14px; border-radius: 18px; font-size: 15px; line-height: 1.45; word-break: break-word; }
     .bubble.mine { background: #06C755; color: white; border-bottom-right-radius: 4px; }
     .bubble.other { background: white; color: #333; border-bottom-left-radius: 4px; }
-    .msg-time { font-size: 10px; margin-top: 3px; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
-    .bubble.mine .msg-time { color: rgba(255,255,255,0.65); }
-    .bubble.other .msg-time { color: rgba(0,0,0,0.45); }
-    .msg-read { font-size: 10px; color: rgba(255,255,255,0.9); white-space: nowrap; }
+    .msg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; padding-bottom: 3px; }
+    .msg-time-text { font-size: 11px; color: rgba(0,0,0,0.42); white-space: nowrap; }
+    .msg-read { font-size: 11px; color: #06C755; font-weight: 600; white-space: nowrap; }
     /* アバター拡大モーダル */
     #avatar-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 350; flex-direction: column; justify-content: center; align-items: center; gap: 16px; }
     #avatar-modal-img { width: 220px; height: 220px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; color: white; font-size: 80px; font-weight: bold; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
@@ -1062,12 +1062,22 @@
       }
       if (msg.text) content += `<span>${linkify(escapeHtml(msg.text))}</span>`;
 
-      // 既読: バブル内タイムスタンプの横に白文字で表示（LINEスタイル）
+      // LINE方式：時刻・既読は吹き出しの外側（mine=左側、other=右側）
       const showRead = isMine && idx === lastReadIdx;
-      const readSpan = showRead ? '<span class="msg-read">既読</span>' : '';
-      row.innerHTML = `<div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'}">
-        <div class="bubble ${isMine?'mine':'other'}">${content}<div class="msg-time">${readSpan}<span>${time}</span></div></div>
-      </div>`;
+      if (isMine) {
+        row.innerHTML = `
+          <div class="msg-meta">
+            ${showRead ? '<span class="msg-read">既読</span>' : ''}
+            <span class="msg-time-text">${time}</span>
+          </div>
+          <div class="bubble mine">${content}</div>`;
+      } else {
+        row.innerHTML = `
+          <div class="bubble other">${content}</div>
+          <div class="msg-meta">
+            <span class="msg-time-text">${time}</span>
+          </div>`;
+      }
       box.appendChild(row);
     });
     box.scrollTop = box.scrollHeight;
