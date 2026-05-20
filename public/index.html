@@ -21,7 +21,7 @@
     .login-card { background: white; border-radius: 16px; padding: 28px 24px; width: calc(100% - 32px); max-width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
     .login-card h1 { text-align: center; font-size: 26px; margin-bottom: 4px; }
     .login-card p { text-align: center; color: #888; margin-bottom: 20px; }
-    .login-card input { display: block; width: 100%; padding: 12px 16px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; outline: none; -webkit-text-size-adjust: 100%; touch-action: manipulation; }
+    .login-card input { display: block; width: 100%; padding: 12px 16px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; outline: none; -webkit-text-size-adjust: 100%; touch-action: manipulation; -webkit-user-select: auto; user-select: auto; }
     .login-card input:focus { border-color: #06C755; }
     .btn-green { width: 100%; padding: 13px; background: #06C755; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
     .btn-green:hover { background: #05a847; }
@@ -115,7 +115,15 @@
     .bubble { max-width: 65%; padding: 8px 14px; border-radius: 18px; font-size: 15px; line-height: 1.4; }
     .bubble.mine { background: #06C755; color: white; border-bottom-right-radius: 4px; }
     .bubble.other { background: white; color: #333; border-bottom-left-radius: 4px; }
-    .msg-time { font-size: 10px; margin-top: 3px; opacity: 0.6; text-align: right; }
+    .msg-time { font-size: 10px; margin-top: 3px; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+    .bubble.mine .msg-time { color: rgba(255,255,255,0.65); }
+    .bubble.other .msg-time { color: rgba(0,0,0,0.45); }
+    .msg-read { font-size: 10px; color: rgba(255,255,255,0.9); white-space: nowrap; }
+    /* アバター拡大モーダル */
+    #avatar-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 350; flex-direction: column; justify-content: center; align-items: center; gap: 16px; }
+    #avatar-modal-img { width: 220px; height: 220px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; color: white; font-size: 80px; font-weight: bold; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+    #avatar-modal-img img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    #avatar-modal-name { color: white; font-size: 22px; font-weight: bold; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
     #input-area { display: none; padding: 10px; background: white; border-top: 1px solid #eee; gap: 8px; align-items: center; }
     #msg-input { flex: 1; padding: 10px 16px; border: 1px solid #ddd; border-radius: 24px; font-size: 16px; outline: none; resize: none; -webkit-text-size-adjust: 100%; }
     #msg-input:focus { border-color: #06C755; }
@@ -248,10 +256,10 @@
     <p id="login-subtitle">ログイン</p>
     <form id="login-form" onsubmit="event.preventDefault(); doAuth();">
       <div id="register-fields" style="display:none">
-        <input id="displayname-input" type="text" placeholder="表示名（任意）" autocomplete="name" autocorrect="off" autocapitalize="none">
+        <input id="displayname-input" type="text" placeholder="表示名（任意）" autocomplete="name" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text">
       </div>
-      <input id="username-input" type="text" placeholder="ユーザー名" autocomplete="username" autocorrect="off" autocapitalize="none">
-      <input id="password-input" type="password" placeholder="パスワード" autocomplete="current-password">
+      <input id="username-input" type="text" placeholder="ユーザー名" autocomplete="username" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text">
+      <input id="password-input" type="password" placeholder="パスワード" autocomplete="current-password" spellcheck="false">
       <div id="error-msg" class="error-msg"></div>
       <button type="button" class="btn-green" id="auth-btn" onclick="doAuth()">ログイン</button>
     </form>
@@ -404,6 +412,13 @@
 <div id="img-modal">
   <button id="img-modal-close">✕</button>
   <img id="img-modal-img" src="">
+</div>
+
+<!-- アバター拡大モーダル -->
+<div id="avatar-modal" onclick="this.style.display='none'">
+  <div id="avatar-modal-img"></div>
+  <div id="avatar-modal-name"></div>
+  <div style="color:rgba(255,255,255,0.5);font-size:13px;margin-top:4px;">タップして閉じる</div>
 </div>
 
 <!-- 友達削除確認モーダル -->
@@ -701,17 +716,19 @@
     } catch {}
   }
 
-  // 友達削除：アイコン4回タップで発動
+  // アイコンタップ：1回 → 拡大表示、4連続 → 友達削除
   const tapCount = {};
   const tapTimer = {};
-  function handleAvatarTap(u, avatarEl) {
+  function handleAvatarTap(u) {
     const id = u.id;
     tapCount[id] = (tapCount[id] || 0) + 1;
     clearTimeout(tapTimer[id]);
-    // 2秒以内に4回タップしなければリセット
-    tapTimer[id] = setTimeout(() => { tapCount[id] = 0; }, 2000);
-    if (tapCount[id] >= 4) {
+    tapTimer[id] = setTimeout(() => { tapCount[id] = 0; }, 1500);
+    if (tapCount[id] === 1) {
+      showAvatarModal(u);
+    } else if (tapCount[id] >= 4) {
       tapCount[id] = 0;
+      $('avatar-modal').style.display = 'none';
       openRemoveFriendModal(u);
     }
   }
@@ -766,9 +783,9 @@
           <div class="contact-name">${u.displayName || u.username}</div>
           <div class="contact-status${isOnline?' online':''}"></div>
         </div>`;
-      // アイコン4回タップで削除
+      // アイコンタップ：1回で拡大、4連続で削除
       const avatarEl = div.querySelector('.avatar');
-      avatarEl.addEventListener('click', (e) => { e.stopPropagation(); handleAvatarTap(u, avatarEl); });
+      avatarEl.addEventListener('click', (e) => { e.stopPropagation(); handleAvatarTap(u); });
       div.onclick = onclick;
       return div;
     };
@@ -1045,11 +1062,11 @@
       }
       if (msg.text) content += `<span>${linkify(escapeHtml(msg.text))}</span>`;
 
-      // 既読ラベル: 最後の既読メッセージにのみ表示、バブルの外側（下）に配置
+      // 既読: バブル内タイムスタンプの横に白文字で表示（LINEスタイル）
       const showRead = isMine && idx === lastReadIdx;
+      const readSpan = showRead ? '<span class="msg-read">既読</span>' : '';
       row.innerHTML = `<div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'}">
-        <div class="bubble ${isMine?'mine':'other'}">${content}<div class="msg-time">${time}</div></div>
-        ${showRead ? '<div style="font-size:10px;color:#06C755;margin-top:2px;">既読</div>' : ''}
+        <div class="bubble ${isMine?'mine':'other'}">${content}<div class="msg-time">${readSpan}<span>${time}</span></div></div>
       </div>`;
       box.appendChild(row);
     });
@@ -1079,6 +1096,24 @@
     $('img-modal').style.display = 'flex';
   };
   $('img-modal').onclick = (e) => { if (e.target === $('img-modal') || e.target === $('img-modal-close')) $('img-modal').style.display = 'none'; };
+
+  // アバター拡大
+  function showAvatarModal(user) {
+    const el = $('avatar-modal-img');
+    const name = user.displayName || user.username || '?';
+    el.innerHTML = '';
+    el.style.background = '#06C755';
+    if (user.avatar) {
+      const img = document.createElement('img');
+      img.src = user.avatar;
+      img.onerror = () => { el.innerHTML = ''; el.textContent = name[0].toUpperCase(); };
+      el.appendChild(img);
+    } else {
+      el.textContent = name[0].toUpperCase();
+    }
+    $('avatar-modal-name').textContent = name;
+    $('avatar-modal').style.display = 'flex';
+  }
 
   // ========== ファイル添付 ==========
   let pendingFile = null;
@@ -1122,18 +1157,24 @@
 
     let fileData = null;
     if (pendingFile) {
-      const formData = new FormData();
-      formData.append('file', pendingFile);
       try {
         $('send-btn').textContent = '送信中';
         $('send-btn').disabled = true;
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token },
-          body: formData
-        });
-        if (!res.ok) throw new Error('upload failed');
-        fileData = await res.json();
+        if (pendingFile.type.startsWith('image/')) {
+          // 画像はクライアント側でbase64化してDBに保存 → サーバー再起動でも消えない
+          const base64 = await resizeAndEncodeImage(pendingFile, 1200);
+          fileData = { url: base64, originalName: pendingFile.name, mimeType: pendingFile.type, size: pendingFile.size, type: 'image' };
+        } else {
+          const formData = new FormData();
+          formData.append('file', pendingFile);
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + token },
+            body: formData
+          });
+          if (!res.ok) throw new Error('upload failed');
+          fileData = await res.json();
+        }
       } catch {
         showToast('ファイルのアップロードに失敗しました');
         return;
@@ -1468,12 +1509,25 @@
     });
   }
 
-  // ログイン入力欄: touchend と click 両方でfocus（iOS PWA対応）
+  // ログイン入力欄: iOS PWA でキーボードを確実に出す
   ['username-input', 'password-input', 'displayname-input'].forEach(id => {
     const el = $(id);
     if (!el) return;
-    el.addEventListener('touchend', function() { this.focus(); });
-    el.addEventListener('click', function() { this.focus(); });
+    // readonly解除トリック: iOS PWAではreadonly→非readonlyに切替るとキーボードが出る
+    el.setAttribute('readonly', true);
+    el.addEventListener('focus', function() { this.removeAttribute('readonly'); });
+    el.addEventListener('touchstart', function(e) {
+      this.removeAttribute('readonly');
+      this.focus();
+    }, { passive: true });
+    el.addEventListener('touchend', function(e) {
+      this.removeAttribute('readonly');
+      this.focus();
+    });
+    el.addEventListener('click', function() {
+      this.removeAttribute('readonly');
+      this.focus();
+    });
   });
 
   // 入力欄タップで確実にフォーカス
