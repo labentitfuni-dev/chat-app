@@ -46,16 +46,4 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// プッシュ購読が期限切れになったとき自動で再購読
-self.addEventListener('pushsubscriptionchange', (event) => {
-  const options = event.oldSubscription?.options || event.newSubscription?.options;
-  if (!options) return;
-  event.waitUntil(
-    self.registration.pushManager.subscribe(options)
-      .then((sub) => fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub)
-      }))
-  );
-});
+// pushsubscriptionchange: アプリ側で再ログイン時に再購読するため不要

@@ -60,4 +60,35 @@ async function sendPushNotification(toUserId, payload) {
   }
 }
 
+router.post('/test', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: '認証が必要です' });
+  try {
+    const { id } = jwt.verify(token, JWT_SECRET);
+    const docs = await PushSub.find({ userId: id });
+    if (!docs.length) return res.status(404).json({ error: 'no_subscription' });
+    let sent = 0;
+    const errors = [];
+    for (const doc of docs) {
+      try {
+        await webpush.sendNotification(doc.subscription, JSON.stringify({
+          title: 'テスト通知',
+          body: '通知が正常に動作しています',
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          data: {}
+        }));
+        sent++;
+      } catch (e) {
+        console.error(`[push/test] error: status=${e.statusCode} msg=${e.message}`);
+        errors.push(String(e.statusCode || e.message));
+        if (e.statusCode === 410 || e.statusCode === 404 || e.statusCode === 401) {
+          await PushSub.deleteOne({ _id: doc._id });
+        }
+      }
+    }
+    res.json({ sent, errors, total: docs.length });
+  } catch { res.status(401).json({ error: 'トークンが無効です' }); }
+});
+
 module.exports = { router, sendPushNotification };

@@ -414,6 +414,10 @@
         <span class="toggle-slider"></span>
       </label>
     </div>
+    <div class="settings-row" style="cursor:pointer" onclick="sendTestPush()">
+      <div class="settings-row-label">テスト通知を送る</div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#aaa"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+    </div>
     <div class="settings-section">アカウント</div>
     <div class="settings-row" style="cursor:pointer" onclick="showInstallGuide()">
       <div class="settings-row-label">ホーム画面に追加</div>
@@ -842,6 +846,18 @@
     const perm = Notification?.permission || 'default';
     const toggle = $('notif-toggle');
     const text   = $('notif-status-text');
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const standalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    if (isIOS && !standalone) {
+      toggle.checked = false;
+      text.textContent = 'ホーム画面に追加後に使用可能';
+      return;
+    }
+    if (!('PushManager' in window)) {
+      toggle.checked = false;
+      text.textContent = 'このブラウザは非対応';
+      return;
+    }
     if (perm === 'granted') {
       toggle.checked = true;
       text.textContent = 'オン';
@@ -858,7 +874,11 @@
     if (checked) {
       await requestNotifPermission();
     } else {
-      // 購読解除
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) await sub.unsubscribe();
+      }
       await fetch('/api/push/unsubscribe', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token }
@@ -1464,12 +1484,14 @@
   // ========== プッシュ通知 ==========
   async function subscribePush(reg) {
     const keyRes = await fetch('/api/push/vapid-public-key');
+    if (!keyRes.ok) throw new Error('VAPID鍵の取得失敗');
     const { key } = await keyRes.json();
 
-    // VAPID鍵が変わっていたら古い購読を削除して再購読
     const savedKey = localStorage.getItem('vapid-public-key');
     let sub = await reg.pushManager.getSubscription();
-    if (sub && savedKey && savedKey !== key) {
+
+    // VAPID鍵が変わった、またはsavedKeyが未設定（旧コードの購読）→ 強制再購読
+    if (sub && (savedKey !== key)) {
       await sub.unsubscribe();
       sub = null;
     }
@@ -1481,11 +1503,12 @@
         applicationServerKey: urlBase64ToUint8Array(key)
       });
     }
-    await fetch('/api/push/subscribe', {
+    const saveRes = await fetch('/api/push/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify(sub)
     });
+    if (!saveRes.ok) throw new Error('購読の保存失敗');
   }
 
   // SW: ページ読み込み時に即登録・更新チェック、30分ごとに定期チェック
@@ -1509,39 +1532,64 @@
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
       const reg = await navigator.serviceWorker.ready;
-
       const perm = Notification.permission;
       if (perm === 'granted') {
         await subscribePush(reg);
       } else if (perm === 'default') {
-        // 未決定 → バナーとボタンを表示
-
         if (!localStorage.getItem('notif-banner-dismissed')) {
           $('notif-banner').style.display = 'flex';
         }
       }
-      // 'denied' の場合は何もしない
     } catch (e) {
-      console.log('Push通知の登録に失敗:', e.message);
+      console.error('Push通知の登録に失敗:', e.message);
     }
   }
 
   async function requestNotifPermission() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const standalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    if (isIOS && !standalone) {
+      showToast('ホーム画面に追加してから通知を許可できます');
+      return;
+    }
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      showToast('iOSはホーム画面に追加してから通知を許可できます');
+      showToast('このブラウザは通知に対応していません');
       return;
     }
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      const reg = await navigator.serviceWorker.ready;
-      await subscribePush(reg);
-      $('notif-banner').style.display = 'none';
-
-      showToast('通知を有効にしました');
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        await subscribePush(reg);
+        $('notif-banner').style.display = 'none';
+        showToast('通知を有効にしました');
+      } catch (e) {
+        showToast('通知の登録に失敗: ' + e.message);
+      }
     } else {
       $('notif-banner').style.display = 'none';
       localStorage.setItem('notif-banner-dismissed', '1');
       showToast('通知が許可されませんでした');
+    }
+    updateNotifToggle();
+  }
+
+  async function sendTestPush() {
+    try {
+      const res = await fetch('/api/push/test', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token }
+      });
+      const data = await res.json();
+      if (res.status === 404) {
+        showToast('購読が未登録です。通知をオンにしてください');
+      } else if (data.sent > 0) {
+        showToast('テスト通知を送信しました');
+      } else {
+        showToast('送信失敗: ' + (data.errors?.[0] || '不明なエラー'));
+      }
+    } catch (e) {
+      showToast('エラー: ' + e.message);
     }
   }
 
