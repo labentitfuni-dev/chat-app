@@ -13,11 +13,12 @@
     body { background: #1a1a2e; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; user-select: none; overflow: hidden; }
 
     .avatar {
-      width: 120px; height: 120px; border-radius: 50%; background: #06C755;
+      width: 160px; height: 160px; border-radius: 50%; background: #06C755;
       display: flex; align-items: center; justify-content: center;
-      font-size: 52px; font-weight: bold; color: white;
-      margin-bottom: 24px; position: relative; z-index: 1;
+      font-size: 68px; font-weight: bold; color: white;
+      margin-bottom: 20px; position: relative; z-index: 1; overflow: hidden;
     }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
     .avatar.ringing::before, .avatar.ringing::after {
       content: ''; position: absolute; border-radius: 50%;
       border: 3px solid rgba(6,199,85,0.35);
@@ -25,12 +26,12 @@
     }
     .avatar.ringing::after { animation-delay: 0.8s; }
     @keyframes ripple {
-      0%   { width: 120px; height: 120px; opacity: 1; }
-      100% { width: 220px; height: 220px; opacity: 0; }
+      0%   { width: 160px; height: 160px; opacity: 1; }
+      100% { width: 300px; height: 300px; opacity: 0; }
     }
 
-    #contact-name { font-size: 26px; font-weight: bold; margin-bottom: 10px; text-align: center; }
-    #status { font-size: 15px; color: #aaa; margin-bottom: 64px; min-height: 22px; text-align: center; }
+    #contact-name { font-size: 26px; font-weight: bold; margin-bottom: 8px; text-align: center; }
+    #status { font-size: 13px; color: #888; margin-bottom: 52px; min-height: 18px; text-align: center; letter-spacing: 0.3px; }
 
     /* ボタン群 */
     .buttons { display: flex; gap: 28px; align-items: flex-end; }
@@ -183,16 +184,33 @@
     let isMuted = false, isSpeakerOn = true;
     let timerSec = 0, timerInterval = null;
     let timerStarted = false;
+    let _audioCtx = null;  // AudioContext（スピーカー出力用）
 
     const $ = id => document.getElementById(id);
 
-    // iOS/Android で AudioContext をアンロック（ページ読み込み直後のタッチで解除）
-    function unlockAudio() {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      ctx.resume().then(() => ctx.close());
+    // AudioContext を生成・再開（iOSスピーカー出力のため維持する）
+    function getAudioCtx() {
+      if (!_audioCtx) {
+        try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+      }
+      if (_audioCtx && _audioCtx.state !== 'running') {
+        _audioCtx.resume().catch(() => {});
+      }
+      return _audioCtx;
     }
-    document.addEventListener('touchstart', unlockAudio, { once: true });
-    document.addEventListener('click',      unlockAudio, { once: true });
+
+    // AudioContextを通してリモート音声をスピーカーに出力（iOS PWAでイヤピースでなくスピーカーから聞こえるようにする）
+    function routeAudioToSpeaker(stream) {
+      try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const src = ctx.createMediaStreamSource(stream);
+        src.connect(ctx.destination);
+      } catch {}
+    }
+
+    // ページ読み込み時に音声バナーを表示してユーザーに早めにタップしてもらう
+    $('audio-banner').style.display = 'flex';
 
     // ---- Socket ----
     const socket = io({ auth: { token } });
@@ -261,6 +279,8 @@
         audio.srcObject = stream;
         audio.volume = 1;
         audio.muted = false;
+        // iOSでスピーカー出力するためAudioContext経由でルーティング
+        routeAudioToSpeaker(stream);
         tryPlayAudio(audio);
         onCallConnected();
       };
@@ -281,6 +301,11 @@
     }
 
     function tryPlayAudio(audio) {
+      // ユーザーがバナーをタップしてAudioContextが生きていれば直接スピーカー出力で再生
+      const ctx = getAudioCtx();
+      if (ctx && ctx.state === 'running' && audio.srcObject) {
+        routeAudioToSpeaker(audio.srcObject);
+      }
       audio.play().then(() => {
         $('audio-banner').style.display = 'none';
         $('speaker-btn').classList.add('active');
@@ -290,22 +315,29 @@
     }
 
     function enableAudio() {
+      // ★ audio.play() はユーザージェスチャーのコールスタック内で同期的に呼ぶ（iOSの制限）
+      // Promise.then() の中で呼ぶとジェスチャーが切れてブロックされる
+      getAudioCtx();  // AudioContextを作成・resume（スピーカー出力のため保持）
+
       const audio = $('remote-audio');
-      // AudioContextを確実にアンロック
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      ctx.resume().then(() => {
-        audio.play().then(() => {
-          $('audio-banner').style.display = 'none';
-          $('speaker-btn').classList.add('active');
-          ctx.close();
-        }).catch(() => {});
-      });
+      $('audio-banner').style.display = 'none';
+      $('speaker-btn').classList.add('active');
+
+      if (audio.srcObject) {
+        routeAudioToSpeaker(audio.srcObject);  // iOS: AudioContext経由でスピーカーへ
+        audio.muted = false;
+        audio.volume = 1;
+        const p = audio.play();
+        if (p) p.catch(() => {});
+      }
     }
 
     // 画面のどこをタップしても音声有効化を試みる
     document.addEventListener('touchstart', () => {
+      getAudioCtx();  // AudioContextをアンロック
       const audio = $('remote-audio');
       if (audio.srcObject && audio.paused) {
+        routeAudioToSpeaker(audio.srcObject);
         audio.play().then(() => {
           $('audio-banner').style.display = 'none';
           $('speaker-btn').classList.add('active');
