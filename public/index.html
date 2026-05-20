@@ -225,15 +225,14 @@
 </head>
 <body>
 
-<!-- ローディング画面 -->
-<div id="loading-screen" style="display:none">
+<!-- スプラッシュ画面（起動時に表示） -->
+<div id="loading-screen">
   <h1>💬 ChatApp</h1>
-  <p id="loading-msg">接続中...</p>
   <div class="spinner"></div>
 </div>
 
 <!-- ログイン画面 -->
-<div id="login-screen">
+<div id="login-screen" style="display:none">
   <div id="login-install-bar" onclick="showInstallGuide()">📲 ホーム画面に追加してアプリとして使う →</div>
   <div class="login-card">
     <h1>💬 ChatApp</h1>
@@ -533,6 +532,7 @@
 
   // ========== アプリ起動 ==========
   function startApp() {
+    $('loading-screen').style.display = 'none';
     $('login-screen').style.display = 'none';
     $('app-screen').style.display = 'flex';
     $('my-info-name').textContent = me.displayName || me.username;
@@ -1287,19 +1287,23 @@
 
   }
 
-  // SWが更新されたら自動でページをリロード
+  // SW: ページ読み込み時に即登録・更新チェック、30分ごとに定期チェック
+  let _swReg = null;
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       window.location.reload();
     });
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      _swReg = reg;
+      reg.update();
+      setInterval(() => reg.update(), 30 * 60 * 1000);
+    }).catch(() => {});
   }
 
   async function registerPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      await reg.update(); // 新しいSWがあれば即チェック
-      await navigator.serviceWorker.ready;
+      const reg = await navigator.serviceWorker.ready;
 
       const perm = Notification.permission;
       if (perm === 'granted') {
@@ -1344,12 +1348,13 @@
   }
 
   // ========== 自動ログイン ==========
-  async function autoLogin() {
-    if (!token || !me) {
-      $('login-screen').style.display = 'flex';
-      return;
-    }
+  function showLoginScreen() {
+    $('loading-screen').style.display = 'none';
+    $('login-screen').style.display = 'flex';
+  }
 
+  async function autoLogin() {
+    if (!token || !me) { showLoginScreen(); return; }
     try {
       const controller = new AbortController();
       const tid = setTimeout(() => controller.abort(), 8000);
@@ -1365,16 +1370,11 @@
       } else {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        $('login-screen').style.display = 'flex';
+        showLoginScreen();
       }
     } catch {
-      // オフラインでもlocalStorageのユーザー情報でアプリ起動
-      if (me && me.id) {
-        startApp();
-      } else {
-        $('login-screen').style.display = 'flex';
-        showError('サーバーに接続できませんでした。');
-      }
+      if (me && me.id) { startApp(); }
+      else { showLoginScreen(); }
     }
   }
 
