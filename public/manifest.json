@@ -1,6 +1,6 @@
 {
-  "name": "ChatApp",
-  "short_name": "ChatApp",
+  "name": "CHA",
+  "short_name": "CHA",
   "description": "チャット & 音声通話アプリ",
   "start_url": "/",
   "display": "standalone",

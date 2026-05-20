@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <title>通話中 - ChatApp</title>
+  <title>通話中 - CHA</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
@@ -181,6 +181,56 @@
     let _audioCtx = null, _speakerSource = null;
     let partnerUserId = null; // 通話相手のuserId（通話時間メッセージ送信用）
 
+    // ========== ピロリ音（発信待機中） ==========
+    let _piroriTimer = null, _piroriPlaying = false;
+
+    function _playPirori() {
+      if (!_audioCtx || _audioCtx.state === 'closed') return;
+      if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
+      // D5→G5→B5→D6 上行 ／ A5→G5→E5 下行
+      const seq = [
+        { f: 587,  d: 0.11 }, // D5
+        { f: 784,  d: 0.11 }, // G5
+        { f: 988,  d: 0.11 }, // B5
+        { f: 1175, d: 0.20 }, // D6
+        { f: 0,    d: 0.06 }, // rest
+        { f: 880,  d: 0.11 }, // A5
+        { f: 784,  d: 0.11 }, // G5
+        { f: 659,  d: 0.18 }, // E5
+      ];
+      let t = _audioCtx.currentTime + 0.04;
+      let totalDur = 0;
+      for (const { f, d } of seq) {
+        if (f > 0) {
+          const osc = _audioCtx.createOscillator();
+          const gain = _audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = f;
+          gain.gain.setValueAtTime(0, t);
+          gain.gain.linearRampToValueAtTime(0.26, t + 0.015);
+          gain.gain.linearRampToValueAtTime(0, t + d - 0.015);
+          osc.connect(gain); gain.connect(_audioCtx.destination);
+          osc.start(t); osc.stop(t + d);
+        }
+        t += d; totalDur += d;
+      }
+      _piroriTimer = setTimeout(_playPirori, (totalDur + 0.65) * 1000);
+    }
+
+    function startPirori() {
+      if (_piroriPlaying) return;
+      _piroriPlaying = true;
+      if (_audioCtx && _audioCtx.state !== 'closed') {
+        _playPirori();
+      }
+      // AudioCtx未作成なら enableAudio() タップ後に startPirori() が再度呼ばれる
+    }
+
+    function stopPirori() {
+      _piroriPlaying = false;
+      clearTimeout(_piroriTimer);
+    }
+
     const $ = id => document.getElementById(id);
 
     // ========== マイク事前取得（ページ読み込み直後に一度だけ許可を取る） ==========
@@ -243,20 +293,22 @@
     socket.on('callRoomWaiting', () => {
       $('status').textContent = '呼び出し中...';
       $('avatar').classList.add('ringing');
-      // 発信者: 60秒応答なければ「応答なし」で終了
+      // 発信者: ピロリ音＋60秒タイムアウト
       if (isInit) {
+        startPirori();
         waitingTimeoutId = setTimeout(() => {
           waitingTimeoutId = null;
+          stopPirori();
           endCall(true);
           $('status').textContent = '応答がありませんでした';
         }, 60000);
       }
-      // バイブで「呼び出し中」を伝える
       if (navigator.vibrate) navigator.vibrate([400, 300, 400, 300, 400]);
     });
 
     socket.on('callRoomReady', ({ users }) => {
       if (waitingTimeoutId) { clearTimeout(waitingTimeoutId); waitingTimeoutId = null; }
+      stopPirori();
       $('avatar').classList.remove('ringing');
       const other = users.find(u => u.userId !== me.id);
       if (other) {
@@ -355,11 +407,19 @@
     // 音声バナーのタップ：autoplay制限を解除してaudio要素で再生開始
     function enableAudio() {
       $('audio-banner').style.display = 'none';
+      // ユーザージェスチャー内でAudioContextを作成（iOS要件）
+      if (!_audioCtx || _audioCtx.state === 'closed') {
+        try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+      }
+      if (_audioCtx) _audioCtx.resume().catch(() => {});
+
+      // ピロリ待機中だった場合はここで開始
+      if (_piroriPlaying && !_piroriTimer) _playPirori();
+
       const audio = $('remote-audio');
       if (!isSpeakerOn) {
         audio.muted = false;
         audio.volume = 1;
-        // play()はユーザージェスチャー内で同期的に呼ぶ（iOSの制限）
         const p = audio.play();
         if (p) p.catch(() => {});
       }
@@ -409,6 +469,7 @@
     }
 
     function endCall(notify = true) {
+      stopPirori();
       if (notify) socket.emit('callHangup', { roomId });
       if (timerInterval) clearInterval(timerInterval);
       if (localStream)   localStream.getTracks().forEach(t => t.stop());

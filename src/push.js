@@ -72,11 +72,11 @@ router.post('/test', async (req, res) => {
     for (const doc of docs) {
       try {
         await webpush.sendNotification(doc.subscription, JSON.stringify({
-          title: 'テスト通知',
-          body: '通知が正常に動作しています',
+          title: '✅ CHA テスト通知',
+          body: 'プッシュ通知が正常に動作しています！',
           icon: '/icon-192.png',
           badge: '/icon-192.png',
-          data: {}
+          data: { type: 'test' }
         }));
         sent++;
       } catch (e) {
