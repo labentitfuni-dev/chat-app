@@ -79,23 +79,23 @@
     #notif-banner-close { background: none; border: none; font-size: 18px; color: #aaa; cursor: pointer; flex-shrink: 0; }
 
     /* 自分のID表示 */
-    #my-info { padding: 10px 16px; background: #f0faf4; border-bottom: 1px solid #e0f0e8; display: flex; align-items: center; gap: 12px; }
+    #my-info { padding: 12px 16px; background: #f0faf4; border-bottom: 1px solid #e0f0e8; display: flex; align-items: center; gap: 14px; }
     #my-avatar-wrap { position: relative; flex-shrink: 0; cursor: pointer; }
-    #my-avatar { width: 48px; height: 48px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold; overflow: hidden; }
+    #my-avatar { width: 64px; height: 64px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; color: white; font-size: 26px; font-weight: bold; overflow: hidden; }
     #my-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    #my-avatar-edit { position: absolute; bottom: 0; right: 0; background: #06C755; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 2px solid white; }
+    #my-avatar-edit { display: none; }
     #my-info-text { flex: 1; min-width: 0; }
-    #my-info-name { font-size: 13px; color: #444; font-weight: 600; }
-    #my-info-code { font-size: 12px; color: #06C755; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+    #my-info-name { font-size: 15px; color: #333; font-weight: 700; }
+    #my-info-code { font-size: 12px; color: #06C755; margin-top: 3px; display: flex; align-items: center; gap: 6px; }
     #copy-code-btn { font-size: 11px; background: #06C755; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; }
     .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
     #contacts-list { flex: 1; overflow-y: auto; }
-    .contact-item { padding: 14px 16px; cursor: pointer; display: flex; align-items: center; border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+    .contact-item { padding: 12px 16px; cursor: pointer; display: flex; align-items: center; border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
     .contact-item:hover { background: #f5f5f5; }
     .contact-item.active { background: #e8f5e9; }
-    .avatar { width: 44px; height: 44px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; font-weight: bold; margin-right: 12px; flex-shrink: 0; position: relative; }
-    .online-dot { position: absolute; bottom: 1px; right: 1px; width: 11px; height: 11px; background: #4CAF50; border-radius: 50%; border: 2px solid white; }
+    .avatar { width: 54px; height: 54px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; font-weight: bold; margin-right: 12px; flex-shrink: 0; position: relative; }
+    .online-dot { position: absolute; bottom: 2px; right: 2px; width: 13px; height: 13px; background: #4CAF50; border-radius: 50%; border: 2px solid white; }
     .contact-info { flex: 1; }
     .contact-name { font-size: 15px; font-weight: 600; }
     .contact-status { font-size: 12px; color: #aaa; margin-top: 2px; }
@@ -759,7 +759,7 @@
       const isOnline = onlineSet.has(u.id);
       div.innerHTML = `
         <div class="avatar" style="position:relative;background:${u.avatar?'transparent':'#06C755'}">
-          ${u.avatar ? `<img src="${u.avatar}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.style.background='#06C755';this.parentElement.insertAdjacentText('afterbegin','${(u.displayName||u.username||'?')[0].toUpperCase()}')">` : (u.displayName||u.username||'?')[0].toUpperCase()}
+          ${u.avatar ? `<img src="${u.avatar}" style="width:54px;height:54px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.style.background='#06C755';this.parentElement.insertAdjacentText('afterbegin','${(u.displayName||u.username||'?')[0].toUpperCase()}')">` : (u.displayName||u.username||'?')[0].toUpperCase()}
           ${isOnline ? '<span class="online-dot"></span>' : ''}
         </div>
         <div class="contact-info">
