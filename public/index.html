@@ -1018,7 +1018,15 @@
   function renderMessages() {
     const box = $('messages');
     box.innerHTML = '';
-    (messages[currentContact?.id] || []).forEach(msg => {
+    const msgs = messages[currentContact?.id] || [];
+
+    // 自分が送った既読済みメッセージの中で最後のもののインデックスを探す（LINE方式）
+    let lastReadIdx = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].fromId === me.id && msgs[i].read) { lastReadIdx = i; break; }
+    }
+
+    msgs.forEach((msg, idx) => {
       const isMine = msg.fromId === me.id;
       const row = document.createElement('div');
       row.className = 'msg-row ' + (isMine ? 'mine' : 'other');
@@ -1036,8 +1044,13 @@
         }
       }
       if (msg.text) content += `<span>${linkify(escapeHtml(msg.text))}</span>`;
-      const readLabel = (isMine && msg.read) ? '<span style="font-size:10px;color:#06C755;margin-right:4px">既読</span>' : '';
-      row.innerHTML = `<div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'}"><div class="bubble ${isMine?'mine':'other'}">${content}<div class="msg-time">${readLabel}${time}</div></div></div>`;
+
+      // 既読ラベル: 最後の既読メッセージにのみ表示、バブルの外側（下）に配置
+      const showRead = isMine && idx === lastReadIdx;
+      row.innerHTML = `<div style="display:flex;flex-direction:column;align-items:${isMine?'flex-end':'flex-start'}">
+        <div class="bubble ${isMine?'mine':'other'}">${content}<div class="msg-time">${time}</div></div>
+        ${showRead ? '<div style="font-size:10px;color:#06C755;margin-top:2px;">既読</div>' : ''}
+      </div>`;
       box.appendChild(row);
     });
     box.scrollTop = box.scrollHeight;
