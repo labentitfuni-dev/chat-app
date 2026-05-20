@@ -154,16 +154,18 @@
 
     /* 通話モーダル */
     #call-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 200; }
-    .call-box { background: #1a1a2e; border-radius: 24px; padding: 48px 40px; text-align: center; width: 320px; }
-    .call-avatar { width: 100px; height: 100px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: bold; color: white; margin: 0 auto 16px; position: relative; }
+    .call-box { background: #1a1a2e; border-radius: 24px; padding: 48px 24px; width: 90%; max-width: 320px; display: flex; flex-direction: column; align-items: center; }
+    .call-avatar { width: 100px; height: 100px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: bold; color: white; margin-bottom: 16px; position: relative; overflow: hidden; flex-shrink: 0; }
+    .call-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
     .call-avatar.ringing::before, .call-avatar.ringing::after {
       content: ''; position: absolute; border-radius: 50%;
       border: 3px solid rgba(6,199,85,0.5); animation: ring-pulse 1.5s ease-out infinite;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
     }
     .call-avatar.ringing::after { animation-delay: 0.5s; }
     @keyframes ring-pulse {
       0% { width: 100px; height: 100px; opacity: 1; }
-      100% { width: 160px; height: 160px; opacity: 0; }
+      100% { width: 170px; height: 170px; opacity: 0; }
     }
     .call-name { color: white; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
     .call-status { color: #aaa; font-size: 15px; margin-bottom: 32px; }
@@ -177,8 +179,8 @@
     #back-btn { display: none; background: none; border: none; color: white; font-size: 22px; cursor: pointer; padding: 4px 8px; }
 
     /* ファイル添付 */
-    #attach-btn { background: none; border: none; font-size: 22px; cursor: pointer; padding: 4px 8px; color: #888; flex-shrink: 0; }
-    #attach-btn:hover { color: #06C755; }
+    #attach-btn { background: none; border: none; cursor: pointer; padding: 0; color: #06C755; flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    #attach-btn:active { background: #e8f5e9; }
     #file-preview-bar { display: none; padding: 8px 12px; background: #f0faf4; border-top: 1px solid #d0ecd8; align-items: center; gap: 10px; }
     #file-preview-bar img { max-height: 60px; max-width: 80px; border-radius: 6px; object-fit: cover; }
     #file-preview-name { flex: 1; font-size: 13px; color: #444; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -338,7 +340,9 @@
     </div>
     <div id="input-area">
       <input type="file" id="file-input" style="display:none" accept="*/*">
-      <button id="attach-btn" title="ファイル・写真を送る">📎</button>
+      <button id="attach-btn" title="ファイル・写真を送る">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
       <textarea id="msg-input" placeholder="メッセージを入力..." rows="1"></textarea>
       <button id="send-btn">送信</button>
     </div>
@@ -1238,8 +1242,14 @@
   }
 
   function showCallModal(contact, status, buttons) {
-    $('call-avatar-letter').textContent = (contact.displayName||contact.username)[0].toUpperCase();
-    $('call-avatar-letter').classList.remove('ringing');
+    const avatarEl = $('call-avatar-letter');
+    avatarEl.classList.remove('ringing');
+    const name = contact.displayName || contact.username || '?';
+    if (contact.avatar) {
+      avatarEl.innerHTML = `<img src="${contact.avatar}" onerror="this.outerHTML='${name[0].toUpperCase()}'">`;
+    } else {
+      avatarEl.textContent = name[0].toUpperCase();
+    }
     $('call-modal-name').textContent = contact.displayName || contact.username;
     $('call-modal-status').textContent = status;
     const btns = $('call-buttons');
