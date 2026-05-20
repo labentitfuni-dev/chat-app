@@ -161,8 +161,8 @@
     /* 通話モーダル */
     #call-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 200; }
     .call-box { background: #1a1a2e; border-radius: 24px; padding: 48px 24px; width: 90%; max-width: 320px; display: flex; flex-direction: column; align-items: center; }
-    .call-avatar { width: 100px; height: 100px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: bold; color: white; margin-bottom: 16px; position: relative; overflow: hidden; flex-shrink: 0; }
-    .call-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .call-avatar { width: 100px; height: 100px; border-radius: 50%; background: #06C755; display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: bold; color: white; margin-bottom: 16px; position: relative; flex-shrink: 0; text-align: center; }
+    .call-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; overflow: hidden; }
     .call-avatar.ringing::before, .call-avatar.ringing::after {
       content: ''; position: absolute; border-radius: 50%;
       border: 3px solid rgba(6,199,85,0.5); animation: ring-pulse 1.5s ease-out infinite;
@@ -173,8 +173,8 @@
       0% { width: 100px; height: 100px; opacity: 1; }
       100% { width: 170px; height: 170px; opacity: 0; }
     }
-    .call-name { color: white; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
-    .call-status { color: #aaa; font-size: 15px; margin-bottom: 32px; }
+    .call-name { color: white; font-size: 24px; font-weight: bold; margin-bottom: 8px; text-align: center; }
+    .call-status { color: #aaa; font-size: 15px; margin-bottom: 32px; text-align: center; }
     .call-buttons { display: flex; justify-content: center; gap: 16px; }
     .call-btn { padding: 14px 28px; border-radius: 40px; border: none; font-size: 15px; font-weight: bold; color: white; cursor: pointer; }
     .call-btn.accept { background: #06C755; }
@@ -1221,6 +1221,11 @@
       signal: { jitsiUrl: callPageUrl, fallbackUrl }
     });
 
+    // 相手の情報を call.html に渡す（localStorage経由）
+    localStorage.setItem('callContact', JSON.stringify({
+      name: contact.displayName || contact.username || '',
+      avatar: contact.avatar || ''
+    }));
     // 発信者はすぐ通話ページへ
     openCallPage(`/call?room=${roomId}&initiator=true`);
 
@@ -1258,6 +1263,13 @@
     socket.emit('answerCall', { toUserId: currentCallContact?.id, signal: {} });
     const url = pendingJitsiUrl;
     pendingJitsiUrl = null;
+    // 発信者の情報を call.html に渡す
+    if (currentCallContact) {
+      localStorage.setItem('callContact', JSON.stringify({
+        name: currentCallContact.displayName || currentCallContact.username || '',
+        avatar: currentCallContact.avatar || ''
+      }));
+    }
     closeCallModal();
     if (url) openCallPage(url);
   }

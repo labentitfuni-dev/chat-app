@@ -29,7 +29,7 @@
       100% { width: 220px; height: 220px; opacity: 0; }
     }
 
-    #contact-name { font-size: 26px; font-weight: bold; margin-bottom: 10px; }
+    #contact-name { font-size: 26px; font-weight: bold; margin-bottom: 10px; text-align: center; }
     #status { font-size: 15px; color: #aaa; margin-bottom: 64px; min-height: 22px; text-align: center; }
 
     /* ボタン群 */
@@ -78,8 +78,8 @@
   <audio id="remote-audio" autoplay playsinline></audio>
   <audio id="local-audio"  autoplay muted playsinline></audio>
 
-  <div id="main">
-    <div class="avatar" id="avatar">?</div>
+  <div id="main" style="display:flex;flex-direction:column;align-items:center;width:100%;">
+    <div class="avatar" id="avatar"></div>
     <div id="contact-name">接続中...</div>
     <div id="status">相手を待っています...</div>
     <div class="buttons">
@@ -147,6 +147,26 @@
 
     if (!roomId || !token) { location.href = '/'; }
 
+    // 相手の情報を即座に表示（発信・着信どちらも）
+    (function showContactInfo() {
+      try {
+        const c = JSON.parse(localStorage.getItem('callContact') || '{}');
+        localStorage.removeItem('callContact');
+        if (!c.name) return;
+        $('contact-name').textContent = c.name;
+        const avatarEl = $('avatar');
+        if (c.avatar) {
+          const img = document.createElement('img');
+          img.src = c.avatar;
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+          img.onerror = () => { avatarEl.removeChild(img); avatarEl.textContent = c.name[0].toUpperCase(); };
+          avatarEl.appendChild(img);
+        } else {
+          avatarEl.textContent = c.name[0].toUpperCase();
+        }
+      } catch {}
+    })();
+
     let iceConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
     async function loadIceServers() {
@@ -189,9 +209,13 @@
     socket.on('callRoomReady', ({ users }) => {
       $('avatar').classList.remove('ringing');
       const other = users.find(u => u.userId !== me.id);
-      if (other) {
+      if (other && other.displayName) {
         $('contact-name').textContent = other.displayName;
-        $('avatar').textContent = other.displayName[0].toUpperCase();
+        // アバターがまだ文字/空なら更新
+        const avatarEl = $('avatar');
+        if (!avatarEl.querySelector('img')) {
+          avatarEl.textContent = other.displayName[0].toUpperCase();
+        }
       }
       $('status').textContent = '接続中...';
       if (isInit) startWebRTC();
