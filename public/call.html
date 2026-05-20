@@ -232,18 +232,31 @@
     $('audio-banner').style.display = 'flex';
 
     // ---- Socket ----
-    const socket = io({ auth: { token } });
+    const socket = io({ auth: { token }, transports: ['websocket'] });
 
     socket.on('connect', () => {
       socket.emit('joinCallRoom', { roomId, displayName: me.displayName || me.username });
     });
 
+    let waitingTimeoutId = null;
+
     socket.on('callRoomWaiting', () => {
-      $('status').textContent = '相手を待っています...';
+      $('status').textContent = '呼び出し中...';
       $('avatar').classList.add('ringing');
+      // 発信者: 60秒応答なければ「応答なし」で終了
+      if (isInit) {
+        waitingTimeoutId = setTimeout(() => {
+          waitingTimeoutId = null;
+          endCall(true);
+          $('status').textContent = '応答がありませんでした';
+        }, 60000);
+      }
+      // バイブで「呼び出し中」を伝える
+      if (navigator.vibrate) navigator.vibrate([400, 300, 400, 300, 400]);
     });
 
     socket.on('callRoomReady', ({ users }) => {
+      if (waitingTimeoutId) { clearTimeout(waitingTimeoutId); waitingTimeoutId = null; }
       $('avatar').classList.remove('ringing');
       const other = users.find(u => u.userId !== me.id);
       if (other) {

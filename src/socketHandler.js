@@ -81,18 +81,18 @@ function setupSocket(io) {
     socket.on('callUser', ({ toUserId, signal }) => {
       const toSocketId = onlineUsers.get(toUserId);
       if (toSocketId) {
+        // アプリ起動中ならsocketで着信通知
         io.to(toSocketId).emit('incomingCall', { fromId: socket.userId, fromName: socket.username, signal });
-      } else {
-        socket.emit('callFailed', { reason: '相手はオフラインです' });
       }
-      // バックグラウンドでもプッシュ通知（/callページのURLを使う）
+      // バックグラウンド・オフラインに関わらず常にプッシュ通知を送る
+      // （callFailed は送らない — call.html 側がタイムアウトで処理する）
       const callUrl = signal?.jitsiUrl || signal?.fallbackUrl;
       sendPushNotification(toUserId, {
-        title: '📞 着信',
-        body: 'タップして通話に参加してください',
+        title: '📞 ' + socket.username,
+        body: '着信中... タップして応答してください',
         icon: '/icon-192.png',
         badge: '/icon-192.png',
-        data: { type: 'call', fromId: socket.userId, callUrl }
+        data: { type: 'call', fromId: socket.userId, fromName: socket.username, callUrl }
       });
     });
 
