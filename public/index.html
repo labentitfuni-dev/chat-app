@@ -1465,7 +1465,16 @@
   async function subscribePush(reg) {
     const keyRes = await fetch('/api/push/vapid-public-key');
     const { key } = await keyRes.json();
+
+    // VAPID鍵が変わっていたら古い購読を削除して再購読
+    const savedKey = localStorage.getItem('vapid-public-key');
     let sub = await reg.pushManager.getSubscription();
+    if (sub && savedKey && savedKey !== key) {
+      await sub.unsubscribe();
+      sub = null;
+    }
+    localStorage.setItem('vapid-public-key', key);
+
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -1477,7 +1486,6 @@
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify(sub)
     });
-
   }
 
   // SW: ページ読み込み時に即登録・更新チェック、30分ごとに定期チェック

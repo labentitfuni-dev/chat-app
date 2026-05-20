@@ -51,8 +51,10 @@ async function sendPushNotification(toUserId, payload) {
     try {
       await webpush.sendNotification(doc.subscription, JSON.stringify(payload));
     } catch (e) {
-      if (e.statusCode === 410 || e.statusCode === 404) {
+      console.error(`[push] sendNotification failed for user ${toUserId}: status=${e.statusCode} msg=${e.message}`);
+      if (e.statusCode === 410 || e.statusCode === 404 || e.statusCode === 401) {
         await PushSub.deleteOne({ _id: doc._id });
+        console.log(`[push] deleted stale subscription for user ${toUserId}`);
       }
     }
   }

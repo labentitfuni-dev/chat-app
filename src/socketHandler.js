@@ -90,8 +90,8 @@ function setupSocket(io) {
       sendPushNotification(toUserId, {
         title: '📞 着信',
         body: 'タップして通話に参加してください',
-        icon: '/icon.svg',
-        badge: '/icon.svg',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
         data: { type: 'call', fromId: socket.userId, callUrl }
       });
     });

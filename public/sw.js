@@ -1,4 +1,4 @@
-const SW_VERSION = 3;
+const SW_VERSION = 4;
 
 self.addEventListener('install', (event) => {
   self.skipWaiting(); // 即座に新しいSWを有効化
@@ -15,8 +15,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'ChatApp', {
       body: data.body || '',
-      icon: data.icon || '/icon.svg',
-      badge: data.badge || '/icon.svg',
+      icon: data.icon || '/icon-192.png',
+      badge: '/icon-192.png',
       vibrate: [400, 200, 400],
       data: data.data || {},
       requireInteraction: data.data?.type === 'call', // 通話通知は消えない
@@ -48,8 +48,10 @@ self.addEventListener('notificationclick', (event) => {
 
 // プッシュ購読が期限切れになったとき自動で再購読
 self.addEventListener('pushsubscriptionchange', (event) => {
+  const options = event.oldSubscription?.options || event.newSubscription?.options;
+  if (!options) return;
   event.waitUntil(
-    self.registration.pushManager.subscribe(event.oldSubscription.options)
+    self.registration.pushManager.subscribe(options)
       .then((sub) => fetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
