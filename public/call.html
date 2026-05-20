@@ -86,20 +86,14 @@
     <div class="buttons">
       <div class="btn-wrap">
         <button class="btn btn-mute" id="mute-btn" onclick="toggleMute()">
-          <!-- マイク -->
-          <svg id="icon-mic" width="28" height="28" viewBox="0 0 24 24" fill="white">
+          <!-- マイク（1つのSVGで斜線をtoggle） -->
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
             <rect x="9" y="2" width="6" height="11" rx="3"/>
             <path d="M5 10a7 7 0 0 0 14 0" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
             <line x1="12" y1="17" x2="12" y2="21" stroke="white" stroke-width="2" stroke-linecap="round"/>
             <line x1="8"  y1="21" x2="16" y2="21" stroke="white" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <!-- ミュート中（斜線） -->
-          <svg id="icon-mic-off" width="28" height="28" viewBox="0 0 24 24" fill="white" style="display:none">
-            <rect x="9" y="2" width="6" height="11" rx="3"/>
-            <path d="M5 10a7 7 0 0 0 14 0" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
-            <line x1="12" y1="17" x2="12" y2="21" stroke="white" stroke-width="2" stroke-linecap="round"/>
-            <line x1="8"  y1="21" x2="16" y2="21" stroke="white" stroke-width="2" stroke-linecap="round"/>
-            <line x1="3"  y1="3"  x2="21" y2="21" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- ミュート時の斜線（左下→右上） -->
+            <line id="mute-slash" x1="3" y1="21" x2="21" y2="3" stroke="white" stroke-width="2.5" stroke-linecap="round" style="display:none"/>
           </svg>
         </button>
         <span class="btn-label" id="mute-label">ミュート</span>
@@ -393,8 +387,7 @@
       if (!localStream) return;
       isMuted = !isMuted;
       localStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
-      $('icon-mic').style.display     = isMuted ? 'none'  : 'inline';
-      $('icon-mic-off').style.display = isMuted ? 'inline': 'none';
+      $('mute-slash').style.display = isMuted ? 'block' : 'none';
       $('mute-label').textContent = isMuted ? 'ミュート中' : 'ミュート';
       $('mute-btn').classList.toggle('active', isMuted);
     }

@@ -17,7 +17,8 @@ const messageSchema = new mongoose.Schema({
   toId:     { type: String, required: true },
   text:     { type: String, default: '' },
   file:     { type: Object, default: null },
-  read:     { type: Boolean, default: false },
+  read:            { type: Boolean, default: false },
+  deletedBySender: { type: Boolean, default: false },
 }, { timestamps: true });
 
 const pushSubSchema = new mongoose.Schema({

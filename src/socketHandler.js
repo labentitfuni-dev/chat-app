@@ -26,11 +26,21 @@ function setupSocket(io) {
     socket.on('getMessages', async ({ toUserId }) => {
       const msgs = await Message.find({
         $or: [
-          { fromId: socket.userId, toId: toUserId },
+          { fromId: socket.userId, toId: toUserId, deletedBySender: { $ne: true } },
           { fromId: toUserId, toId: socket.userId }
         ]
       }).sort({ createdAt: 1 }).lean();
       socket.emit('messageHistory', msgs.map(m => ({ ...m, id: m._id.toString() })));
+    });
+
+    socket.on('deleteMessage', async ({ messageId }) => {
+      try {
+        await Message.findOneAndUpdate(
+          { _id: messageId, fromId: socket.userId },
+          { deletedBySender: true }
+        );
+        socket.emit('messageDeleted', { messageId });
+      } catch {}
     });
 
     socket.on('sendMessage', async ({ toUserId, text, file }) => {
