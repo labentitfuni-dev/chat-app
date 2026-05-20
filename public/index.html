@@ -236,14 +236,14 @@
   <div class="login-card">
     <h1>💬 ChatApp</h1>
     <p id="login-subtitle">ログイン</p>
-    <form id="login-form" onsubmit="event.preventDefault(); $('auth-btn').click();">
+    <form id="login-form" onsubmit="event.preventDefault(); doAuth();">
       <div id="register-fields" style="display:none">
         <input id="displayname-input" type="text" placeholder="表示名（任意）" autocomplete="name" autocorrect="off" autocapitalize="none">
       </div>
       <input id="username-input" type="text" placeholder="ユーザー名" autocomplete="username" autocorrect="off" autocapitalize="none">
       <input id="password-input" type="password" placeholder="パスワード" autocomplete="current-password">
       <div id="error-msg" class="error-msg"></div>
-      <button type="submit" class="btn-green" id="auth-btn">ログイン</button>
+      <button type="button" class="btn-green" id="auth-btn" onclick="doAuth()">ログイン</button>
     </form>
     <p class="switch-link" id="switch-link">アカウントを作成する →</p>
   </div>
@@ -497,25 +497,34 @@
     $('register-fields').style.display = isLogin ? 'none' : 'block';
   };
 
-  $('auth-btn').onclick = async () => {
+  let authBusy = false;
+  async function doAuth() {
+    if (authBusy) return;
     const username = $('username-input').value.trim();
     const password = $('password-input').value.trim();
     const displayName = $('displayname-input').value.trim();
     if (!username || !password) { showError('ユーザー名とパスワードを入力してください'); return; }
+    authBusy = true;
+    $('auth-btn').disabled = true;
+    $('auth-btn').textContent = '処理中...';
     try {
       const res = await fetch(`/api/auth/${isLogin ? 'login' : 'register'}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, displayName })
       });
       const data = await res.json();
-      if (!res.ok) { showError(data.error); return; }
+      if (!res.ok) { showError(data.error || 'エラーが発生しました'); return; }
       token = data.token; me = data.user;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(me));
       startApp();
     } catch { showError('サーバーに接続できません'); }
-  };
-  $('password-input').onkeydown = e => { if (e.key === 'Enter') $('auth-btn').click(); };
+    finally {
+      authBusy = false;
+      $('auth-btn').disabled = false;
+      $('auth-btn').textContent = isLogin ? 'ログイン' : '登録';
+    }
+  }
   function showError(msg) { $('error-msg').textContent = msg; }
 
   // ========== アプリ起動 ==========
@@ -610,7 +619,15 @@
 
   // ========== Socket ==========
   function connectSocket() {
+    if (socket) { socket.disconnect(); socket = null; }
     socket = io({ auth: { token } });
+    socket.on('connect_error', (err) => {
+      if (err.message === 'トークンが無効です' || err.message === '認証が必要です') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        location.reload();
+      }
+    });
     socket.on('userOnline', ({ userId }) => { onlineSet.add(userId); });
     socket.on('userOffline', ({ userId }) => { onlineSet.delete(userId); });
     socket.on('messagesRead', ({ byUserId }) => {
@@ -655,9 +672,12 @@
 
   // ========== 友達一覧 ==========
   async function fetchFriends() {
-    const res = await fetch('/api/auth/friends', { headers: { Authorization: 'Bearer ' + token } });
-    friends = await res.json();
-    renderFriends();
+    try {
+      const res = await fetch('/api/auth/friends', { headers: { Authorization: 'Bearer ' + token } });
+      if (!res.ok) return;
+      friends = await res.json();
+      renderFriends();
+    } catch {}
   }
 
   // 友達削除：アイコン4回タップで発動
@@ -1046,7 +1066,9 @@
   $('file-preview-cancel').onclick = () => {
     pendingFile = null;
     $('file-preview-bar').style.display = 'none';
-    $('file-preview-img').src = '';
+    const img = $('file-preview-img');
+    if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+    img.src = '';
   };
 
   $('send-btn').onclick = sendMessage;
@@ -1370,7 +1392,8 @@
       }
 
       // ログイン画面：キーボードが出たら入力欄が見えるようスクロール
-      if (loginScreen && loginScreen.style.display !== 'none' && keyboardHeight > 100) {
+      const loginVisible = loginScreen && getComputedStyle(loginScreen).display !== 'none';
+      if (loginVisible && keyboardHeight > 100) {
         const active = document.activeElement;
         if (active && active.tagName === 'INPUT') {
           setTimeout(() => active.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
@@ -1379,13 +1402,12 @@
     });
   }
 
-  // ログイン入力欄: touchendでfocus（iOSはtouchendからのfocusでキーボードが出る）
+  // ログイン入力欄: touchend と click 両方でfocus（iOS PWA対応）
   ['username-input', 'password-input', 'displayname-input'].forEach(id => {
     const el = $(id);
     if (!el) return;
-    el.addEventListener('touchend', function(e) {
-      this.focus();
-    });
+    el.addEventListener('touchend', function() { this.focus(); });
+    el.addEventListener('click', function() { this.focus(); });
   });
 
   // 入力欄タップで確実にフォーカス
