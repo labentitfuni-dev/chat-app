@@ -179,6 +179,7 @@
     let timerSec = 0, timerInterval = null;
     let timerStarted = false;
     let _audioCtx = null, _speakerSource = null;
+    let partnerUserId = null; // 通話相手のuserId（通話時間メッセージ送信用）
 
     const $ = id => document.getElementById(id);
 
@@ -245,12 +246,14 @@
     socket.on('callRoomReady', ({ users }) => {
       $('avatar').classList.remove('ringing');
       const other = users.find(u => u.userId !== me.id);
-      if (other && other.displayName) {
-        $('contact-name').textContent = other.displayName;
-        // アバターがまだ文字/空なら更新
-        const avatarEl = $('avatar');
-        if (!avatarEl.querySelector('img')) {
-          avatarEl.textContent = other.displayName[0].toUpperCase();
+      if (other) {
+        partnerUserId = other.userId;
+        if (other.displayName) {
+          $('contact-name').textContent = other.displayName;
+          const avatarEl = $('avatar');
+          if (!avatarEl.querySelector('img')) {
+            avatarEl.textContent = other.displayName[0].toUpperCase();
+          }
         }
       }
       $('status').textContent = '接続中...';
@@ -397,10 +400,30 @@
       if (timerInterval) clearInterval(timerInterval);
       if (localStream)   localStream.getTracks().forEach(t => t.stop());
       if (pc)            { pc.close(); pc = null; }
-      $('status').textContent = '通話終了';
+
+      // 通話時間を計算して表示
+      let durationText = '';
+      if (timerSec > 0) {
+        const m = Math.floor(timerSec / 60);
+        const s = timerSec % 60;
+        durationText = m > 0 ? `${m}分${s}秒` : `${s}秒`;
+        $('status').textContent = `通話時間  ${durationText}`;
+
+        // チャットに通話時間を記録（LINE方式）
+        if (partnerUserId) {
+          socket.emit('sendMessage', {
+            toUserId: partnerUserId,
+            text: `📞 通話  ${durationText}`,
+            file: null
+          });
+        }
+      } else {
+        $('status').textContent = '通話終了';
+      }
+
       $('main').querySelector('.buttons').innerHTML =
         '<div class="btn-wrap"><button class="btn btn-back" onclick="goBack()">← 戻る</button></div>';
-      setTimeout(goBack, 2000);
+      setTimeout(goBack, 3000);
     }
 
     function showError(msg) {

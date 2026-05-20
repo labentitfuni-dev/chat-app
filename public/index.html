@@ -1806,23 +1806,8 @@
     socket.on('callEnded', () => { closeCallModal(); showToast('通話終了'); });
     socket.on('callFailed', ({ reason }) => {
       clearCallTimeout();
-      const jitsiUrl = currentJitsiUrl;
-      const callContact = currentCallContact;
       closeCallModal();
-      if (jitsiUrl && callContact) {
-        socket.emit('sendMessage', {
-          toUserId: callContact.id,
-          text: `📞 通話リクエスト（タップして参加）\n${jitsiUrl}`,
-          file: null
-        });
-        showCallModal(callContact, 'オフラインのため通知を送りました', [
-          { label: '📞 通話を開始', cls: 'accept', fn: () => { closeCallModal(); window.open(jitsiUrl, '_blank'); }},
-          { label: '閉じる', cls: 'end', fn: closeCallModal }
-        ]);
-        currentJitsiUrl = null;
-      } else {
-        showToast('📵 ' + (reason || '相手はオフラインです'));
-      }
+      showToast('📵 ' + (reason || '相手はオフラインです'));
     });
     socket.on('iceCandidate', async ({ candidate }) => {
       if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
