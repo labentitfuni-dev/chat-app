@@ -55,17 +55,17 @@ function setupSocket(io) {
       const toSocketId = onlineUsers.get(toUserId);
       if (toSocketId) {
         io.to(toSocketId).emit('newMessage', out);
-      } else {
-        const recipient = await User.findById(toUserId).lean();
-        const hideContent = recipient?.hideNotifContent;
-        sendPushNotification(toUserId, {
-          title: socket.username,
-          body: hideContent ? '新しいメッセージがあります' : (out.file ? '📎 ファイルが届きました' : out.text),
-          icon: '/icon.svg',
-          badge: '/icon.svg',
-          data: { fromId: socket.userId }
-        });
       }
+      // オンライン・バックグラウンド問わず常にpushを送る（SWがフォアグラウンド時は表示を抑制）
+      const recipient = await User.findById(toUserId).lean();
+      const hideContent = recipient?.hideNotifContent;
+      sendPushNotification(toUserId, {
+        title: socket.username,
+        body: hideContent ? '新しいメッセージがあります' : (out.file ? '📎 ファイルが届きました' : out.text),
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        data: { fromId: socket.userId }
+      });
     });
 
     socket.on('markRead', async ({ fromUserId }) => {

@@ -734,7 +734,23 @@
       if (!res.ok) return;
       friends = await res.json();
       renderFriends();
+      // 通知タップで起動したとき（?chat=userId）は該当チャットを自動で開く
+      const chatParam = new URLSearchParams(location.search).get('chat');
+      if (chatParam) {
+        history.replaceState({}, '', '/');
+        openChatFromUserId(chatParam);
+      }
     } catch {}
+  }
+
+  function openChatFromUserId(userId) {
+    const contact = friends.find(f => f.id === userId);
+    if (!contact) return;
+    openChat(contact);
+    if (isMobile()) {
+      $('sidebar').classList.add('hidden');
+      $('chat-panel').classList.add('show');
+    }
   }
 
   // アイコンタップ：1回 → 拡大表示、4連続 → 友達削除
@@ -1524,10 +1540,20 @@
     });
     navigator.serviceWorker.register('/sw.js').then(reg => {
       _swReg = reg;
-      // 初回登録直後のcontrollerchangeではリロードしないよう少し待つ
       setTimeout(() => reg.update(), 1000);
       setInterval(() => reg.update(), 30 * 60 * 1000);
     }).catch(() => {});
+
+    // 通知タップ時にSWからpostMessageでチャットを開く指示を受け取る
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type === 'open-chat' && event.data.fromId) {
+        openChatFromUserId(event.data.fromId);
+        if (isMobile()) {
+          $('sidebar').classList.add('hidden');
+          $('chat-panel').classList.add('show');
+        }
+      }
+    });
   }
 
   async function registerPush() {
@@ -1538,7 +1564,11 @@
       if (perm === 'granted') {
         await subscribePush(reg);
       } else if (perm === 'default') {
-        if (!localStorage.getItem('notif-banner-dismissed')) {
+        const standalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+        if (standalone) {
+          // ホーム画面追加済み → 自動で許可ダイアログを出す
+          await requestNotifPermission();
+        } else if (!localStorage.getItem('notif-banner-dismissed')) {
           $('notif-banner').style.display = 'flex';
         }
       }
