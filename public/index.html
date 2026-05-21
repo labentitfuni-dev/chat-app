@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v22-keyboard-fix">
+  <meta name="app-version" content="v23-stability">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -930,6 +930,7 @@
   async function fetchFriends() {
     try {
       const res = await fetch('/api/auth/friends', { headers: { Authorization: 'Bearer ' + token } });
+      if (res.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('user'); location.reload(); return; }
       if (!res.ok) return;
       friends = await res.json();
       renderFriends();
@@ -1228,11 +1229,12 @@
 
   $('back-btn').onclick = () => { $('sidebar').classList.remove('hidden'); $('chat-panel').classList.remove('show'); };
 
-  // messageHistory の競合を防ぐためにリクエスト中のcontactIdを追跡
-  let _pendingHistoryId = null;
+  // messageHistory の競合を防ぐ: FIFOキューでリクエスト順を追跡
+  // 複数リクエストが飛んでも到着順に正しいコンタクトへ割り当て
+  let _pendingHistoryQueue = [];
 
   function requestMessages(contactId) {
-    _pendingHistoryId = contactId;
+    _pendingHistoryQueue.push(contactId);
     socket.emit('getMessages', { toUserId: contactId });
   }
 
@@ -2289,11 +2291,10 @@
         location.reload();
       }
     });
-    // messageHistory は一元管理（socket.once の競合を防ぐ）
+    // messageHistory は一元管理（FIFOキューで到着順に割り当て）
     socket.on('messageHistory', msgs => {
-      const targetId = _pendingHistoryId;
-      _pendingHistoryId = null;
-      if (!targetId || currentContact?.id !== targetId) return;
+      const targetId = _pendingHistoryQueue.shift(); // 最も古いリクエストを取り出す
+      if (!targetId || currentContact?.id !== targetId) return; // 既にチャット切替済みならスキップ
       messages[targetId] = msgs;
       renderMessages();
       socket.emit('markRead', { fromUserId: targetId });
@@ -2301,6 +2302,7 @@
 
     let _isFirstConnect = true;
     socket.on('connect', () => {
+      _pendingHistoryQueue = []; // 再接続時は古いリクエストをリセット
       if (_isFirstConnect) { _isFirstConnect = false; return; } // 初回はstartApp側で取得済み
       // 再接続時のみ友達一覧とメッセージを更新
       debouncedFetchFriends();
