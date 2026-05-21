@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v28-keyboard-fix4">
+  <meta name="app-version" content="v29-keyboard-fix5">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -2174,20 +2174,16 @@
     });
   }
 
-  // ログイン入力欄: touchend で明示的に focus()（補助的なフォールバック）
-  // ログイン入力欄: iOS PWA キーボード確実表示
-  // touchstart（指が触れた瞬間）でfocus → iOS がtouchend時にキーボード判定する前にフォーカス確定
-  // onclick も追加（touchstart が何らかの理由で効かない場合のフォールバック）
-  ['username-input', 'password-input', 'displayname-input'].forEach(id => {
-    const el = $(id);
-    if (!el) return;
-    el.addEventListener('touchstart', function() { this.focus(); }, { passive: true });
-    el.addEventListener('click',      function() { this.focus(); });
-  });
+  // ログイン入力欄: JSフォーカスハンドラーは不要・有害
+  // v27で login-screen を display:none にしなくなったため、
+  // iOSはこれらのinputを最初からネイティブにインタラクティブと認識する。
+  // touchstart/touchend で focus() を呼ぶと iOS WKWebView が
+  // 「プログラム的フォーカス済み」と判断してキーボードを表示しない。
+  // → ネイティブタップに完全に任せる（何も追加しない）
 
-  // チャット入力欄も同様
-  $('msg-input').addEventListener('touchstart', function() { this.focus(); }, { passive: true });
-  $('msg-input').addEventListener('click',      function() { this.focus(); });
+  // チャット入力欄: #input-area が display:none から始まるため touchend で補助
+  // （chat入力欄だけは従来通り touchend フォーカス）
+  $('msg-input').addEventListener('touchend', function() { this.focus(); }, { passive: true });
 
 
   // ========== インストール判定ユーティリティ ==========
