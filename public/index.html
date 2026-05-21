@@ -1302,8 +1302,8 @@
     if (msg.isMissedCall) {
       const missedCls = 'bubble-missed-call' + (isMine ? ' mine' : '');
       if (isMine) {
-        row.style.cssText = 'display:flex;flex-direction:row;align-items:flex-end;justify-content:flex-end;gap:5px;margin-bottom:1px;';
-        row.innerHTML = `<div class="msg-meta" style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-bottom:2px;"><span class="msg-time-text">${time}</span></div><div class="${missedCls}">📵 不在着信</div>`;
+        row.style.cssText = 'display:block;width:100%;text-align:right;margin-bottom:1px;';
+        row.innerHTML = `<span style="display:inline-block;vertical-align:bottom;font-size:10px;color:rgba(0,0,0,0.32);white-space:nowrap;padding-bottom:4px;padding-right:5px;">${time}</span><div class="${missedCls}" style="display:inline-block;text-align:left;vertical-align:bottom;">📵 不在着信</div>`;
       } else {
         row.innerHTML = `
           <div class="${missedCls}">📵 不在着信</div>
@@ -1326,9 +1326,11 @@
     }
     if (msg.text) content += `<span>${linkify(escapeHtml(msg.text))}</span>`;
     if (isMine) {
-      // inline styleで確実に左(時刻)→右(バブル)固定（CSSキャッシュに左右されない）
-      row.style.cssText = 'display:flex;flex-direction:row;align-items:flex-end;justify-content:flex-end;gap:5px;margin-bottom:1px;';
-      row.innerHTML = `<div class="msg-meta" style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-bottom:2px;gap:2px;">${showRead ? '<span class="msg-read">既読</span>' : ''}<span class="msg-time-text">${time}</span></div><div class="bubble mine" style="max-width:72%;">${content}</div>`;
+      // text-align:right + inline-block で [既読][時刻][バブル] を右詰め（時刻はバブルの左）
+      row.style.cssText = 'display:block;width:100%;text-align:right;margin-bottom:1px;';
+      const readSpan = showRead ? `<span style="display:inline-block;vertical-align:bottom;font-size:10px;color:#3d9a6a;font-weight:700;white-space:nowrap;padding-bottom:4px;padding-right:2px;">既読</span>` : '';
+      const timeSpan = `<span style="display:inline-block;vertical-align:bottom;font-size:10px;color:rgba(0,0,0,0.32);white-space:nowrap;padding-bottom:4px;padding-right:5px;">${time}</span>`;
+      row.innerHTML = `${readSpan}${timeSpan}<div class="bubble mine" style="display:inline-block;text-align:left;max-width:72%;vertical-align:bottom;">${content}</div>`;
       const wrap = document.createElement('div');
       wrap.className = 'swipe-wrap';
       const delBtn = document.createElement('button');
