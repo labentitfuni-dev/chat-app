@@ -33,7 +33,6 @@
     #contact-name { font-size: 26px; font-weight: bold; margin-bottom: 8px; text-align: center; }
     #status { font-size: 13px; color: #888; margin-bottom: 52px; min-height: 18px; text-align: center; letter-spacing: 0.3px; }
 
-    /* ボタン群 */
     .buttons { display: flex; gap: 28px; align-items: flex-end; }
     .btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
     .btn-label { font-size: 12px; color: #aaa; }
@@ -49,10 +48,9 @@
     .btn-speaker { width: 64px; height: 64px; font-size: 26px; background: #2a2a3e; color: white; }
     .btn-speaker.active { background: #06C755; }
 
-    /* 音声有効化オーバーレイ */
     #audio-banner {
       display: none; position: fixed; inset: 0; z-index: 100;
-      background: rgba(0,0,0,0.75);
+      background: rgba(0,0,0,0.80);
       flex-direction: column; align-items: center; justify-content: center; gap: 20px;
     }
     #audio-banner .tap-btn {
@@ -76,8 +74,9 @@
   </style>
 </head>
 <body>
+  <!-- playsinline + autoplay はブラウザのポリシーに従う。音声ウォッチドッグで確実に再生 -->
   <audio id="remote-audio" autoplay playsinline></audio>
-  <audio id="local-audio"  autoplay muted playsinline></audio>
+  <audio id="local-audio"  autoplay muted   playsinline></audio>
 
   <div id="main" style="display:flex;flex-direction:column;align-items:center;width:100%;">
     <div class="avatar" id="avatar"></div>
@@ -86,13 +85,11 @@
     <div class="buttons">
       <div class="btn-wrap">
         <button class="btn btn-mute" id="mute-btn" onclick="toggleMute()">
-          <!-- マイク（1つのSVGで斜線をtoggle） -->
           <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
             <rect x="9" y="2" width="6" height="11" rx="3"/>
             <path d="M5 10a7 7 0 0 0 14 0" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
             <line x1="12" y1="17" x2="12" y2="21" stroke="white" stroke-width="2" stroke-linecap="round"/>
             <line x1="8"  y1="21" x2="16" y2="21" stroke="white" stroke-width="2" stroke-linecap="round"/>
-            <!-- ミュート時の斜線（左下→右上） -->
             <line id="mute-slash" x1="3" y1="21" x2="21" y2="3" stroke="white" stroke-width="2.5" stroke-linecap="round" style="display:none"/>
           </svg>
         </button>
@@ -101,7 +98,6 @@
 
       <div class="btn-wrap">
         <button class="btn btn-end" onclick="endCall(true)">
-          <!-- 終話（受話器を斜めに） -->
           <svg width="34" height="34" viewBox="0 0 24 24" fill="white">
             <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.27-.27.67-.37 1.02-.22 1.1.4 2.28.62 3.58.62.55 0 1 .45 1 1V20c0 .55-.45 1-1 1C10.56 21 3 13.44 3 4c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.32.22 2.58.62 3.76.12.33.04.7-.22.97L6.6 10.8z" transform="rotate(135 12 12)"/>
           </svg>
@@ -111,7 +107,6 @@
 
       <div class="btn-wrap">
         <button class="btn btn-speaker" id="speaker-btn" onclick="toggleSpeaker()">
-          <!-- スピーカー -->
           <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
             <polygon points="11,5 6,9 2,9 2,15 6,15 11,19"/>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
@@ -139,10 +134,11 @@
     const isInit = params.get('initiator') === 'true';
     const token  = localStorage.getItem('token');
     const me     = JSON.parse(localStorage.getItem('user') || '{}');
+    const $      = id => document.getElementById(id);
 
     if (!roomId || !token) { location.href = '/'; }
 
-    // 相手の情報を即座に表示（発信・着信どちらも）
+    // 相手の情報を即座に表示
     (function showContactInfo() {
       try {
         const c = JSON.parse(localStorage.getItem('callContact') || '{}');
@@ -162,50 +158,163 @@
       } catch {}
     })();
 
+    // ══════════════════════════════════════════
+    //  状態変数
+    // ══════════════════════════════════════════
+    let pc              = null;
+    let localStream     = null;
+    let isMuted         = false;
+    let isSpeakerOn     = false;
+    let timerSec        = 0;
+    let timerInterval   = null;
+    let timerStarted    = false;
+    let partnerUserId   = null;
+    let _audioCtx       = null;
+    let _speakerSource  = null;
+    let _audioUnlocked  = false;   // ユーザータップで音声が解放されたか
+    let _audioWatchdog  = null;    // 音声ウォッチドッグタイマー
+    let _iceRestartTimer = null;   // ICE再接続タイマー
+    let _iceRestartCount = 0;      // ICE再接続試行回数
+    let _localStreamReady = false; // マイク準備完了フラグ
+    let _localStreamWaiters = [];  // マイク待ちPromiseのリゾルバ
     let iceConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
+    // ══════════════════════════════════════════
+    //  ICEサーバー読み込み
+    // ══════════════════════════════════════════
     async function loadIceServers() {
       try {
         const res = await fetch('/api/ice-servers');
         const servers = await res.json();
-        if (Array.isArray(servers) && servers.length > 0) {
-          iceConfig = { iceServers: servers };
-        }
+        if (Array.isArray(servers) && servers.length > 0) iceConfig = { iceServers: servers };
       } catch {}
     }
 
-    let pc = null, localStream = null;
-    let isMuted = false, isSpeakerOn = false;
-    let timerSec = 0, timerInterval = null;
-    let timerStarted = false;
-    let _audioCtx = null, _speakerSource = null;
-    let partnerUserId = null; // 通話相手のuserId（通話時間メッセージ送信用）
+    // ══════════════════════════════════════════
+    //  マイク取得（ページ読み込み直後・Promise化）
+    // ══════════════════════════════════════════
+    function waitLocalStream() {
+      if (_localStreamReady) return Promise.resolve(localStream);
+      return new Promise(resolve => _localStreamWaiters.push(resolve));
+    }
 
-    // ========== ピロリ音（発信待機中） ==========
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      .then(stream => {
+        localStream = stream;
+        $('local-audio').srcObject = stream;
+        _localStreamReady = true;
+        _localStreamWaiters.forEach(r => r(stream));
+        _localStreamWaiters = [];
+      })
+      .catch(() => {
+        showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してから\nもう一度お試しください。');
+      });
+
+    // ══════════════════════════════════════════
+    //  音声ウォッチドッグ（確実に再生し続ける）
+    // ══════════════════════════════════════════
+    function startAudioWatchdog() {
+      stopAudioWatchdog();
+      _audioWatchdog = setInterval(() => {
+        const audio = $('remote-audio');
+        if (!audio || !audio.srcObject || isSpeakerOn) return;
+        if (audio.paused || audio.ended) {
+          audio.muted  = false;
+          audio.volume = 1.0;
+          audio.play()
+            .then(() => { $('audio-banner').style.display = 'none'; })
+            .catch(() => { $('audio-banner').style.display = 'flex'; });
+        }
+      }, 1500);
+    }
+
+    function stopAudioWatchdog() {
+      if (_audioWatchdog) { clearInterval(_audioWatchdog); _audioWatchdog = null; }
+    }
+
+    // ══════════════════════════════════════════
+    //  音声再生（複数手段でリトライ）
+    // ══════════════════════════════════════════
+    function tryPlayAudio(audio) {
+      if (isSpeakerOn) return;
+      audio.muted  = false;
+      audio.volume = 1.0;
+
+      function attempt(retry) {
+        if (!audio.srcObject) return;
+        audio.play()
+          .then(() => {
+            $('audio-banner').style.display = 'none';
+            _audioUnlocked = true;
+            startAudioWatchdog();
+          })
+          .catch(() => {
+            if (retry > 0) {
+              setTimeout(() => attempt(retry - 1), 400);
+            } else {
+              // ユーザータップが必要
+              $('audio-banner').style.display = 'flex';
+              startAudioWatchdog(); // タップ後に確実に再生できるよう監視継続
+            }
+          });
+      }
+      attempt(5); // 最大5回リトライ
+    }
+
+    // 音声バナータップ
+    function enableAudio() {
+      $('audio-banner').style.display = 'none';
+      _audioUnlocked = true;
+
+      // AudioContext初期化（スピーカー用）
+      if (!_audioCtx || _audioCtx.state === 'closed') {
+        try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+      }
+      if (_audioCtx) _audioCtx.resume().catch(() => {});
+
+      // ピロリ待機中ならここで開始
+      if (_piroriPlaying && !_piroriTimer) _playPirori();
+
+      const audio = $('remote-audio');
+      if (!isSpeakerOn) {
+        audio.muted  = false;
+        audio.volume = 1.0;
+        audio.play()
+          .then(() => startAudioWatchdog())
+          .catch(() => startAudioWatchdog()); // ウォッチドッグに任せる
+      }
+    }
+
+    // 画面タップでも再生を試みる（バナー以外の場所でもOK）
+    document.addEventListener('touchstart', () => {
+      const audio = $('remote-audio');
+      if (!isSpeakerOn && audio && audio.srcObject && audio.paused) {
+        audio.play()
+          .then(() => {
+            $('audio-banner').style.display = 'none';
+            _audioUnlocked = true;
+          })
+          .catch(() => {});
+      }
+    }, { passive: true });
+
+    // ══════════════════════════════════════════
+    //  ピロリ音（発信待機中）
+    // ══════════════════════════════════════════
     let _piroriTimer = null, _piroriPlaying = false;
 
     function _playPirori() {
       if (!_audioCtx || _audioCtx.state === 'closed') return;
       if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
-      // D5→G5→B5→D6 上行 ／ A5→G5→E5 下行
       const seq = [
-        { f: 587,  d: 0.11 }, // D5
-        { f: 784,  d: 0.11 }, // G5
-        { f: 988,  d: 0.11 }, // B5
-        { f: 1175, d: 0.20 }, // D6
-        { f: 0,    d: 0.06 }, // rest
-        { f: 880,  d: 0.11 }, // A5
-        { f: 784,  d: 0.11 }, // G5
-        { f: 659,  d: 0.18 }, // E5
+        { f: 587,  d: 0.11 }, { f: 784,  d: 0.11 }, { f: 988,  d: 0.11 }, { f: 1175, d: 0.20 },
+        { f: 0,    d: 0.06 }, { f: 880,  d: 0.11 }, { f: 784,  d: 0.11 }, { f: 659,  d: 0.18 },
       ];
-      let t = _audioCtx.currentTime + 0.04;
-      let totalDur = 0;
+      let t = _audioCtx.currentTime + 0.04, totalDur = 0;
       for (const { f, d } of seq) {
         if (f > 0) {
-          const osc = _audioCtx.createOscillator();
-          const gain = _audioCtx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = f;
+          const osc = _audioCtx.createOscillator(), gain = _audioCtx.createGain();
+          osc.type = 'sine'; osc.frequency.value = f;
           gain.gain.setValueAtTime(0, t);
           gain.gain.linearRampToValueAtTime(0.26, t + 0.015);
           gain.gain.linearRampToValueAtTime(0, t + d - 0.015);
@@ -220,72 +329,60 @@
     function startPirori() {
       if (_piroriPlaying) return;
       _piroriPlaying = true;
-      if (_audioCtx && _audioCtx.state !== 'closed') {
-        _playPirori();
-      }
-      // AudioCtx未作成なら enableAudio() タップ後に startPirori() が再度呼ばれる
+      if (_audioCtx && _audioCtx.state !== 'closed') _playPirori();
     }
 
     function stopPirori() {
       _piroriPlaying = false;
-      clearTimeout(_piroriTimer);
+      if (_piroriTimer) { clearTimeout(_piroriTimer); _piroriTimer = null; }
     }
 
-    const $ = id => document.getElementById(id);
-
-    // ========== マイク事前取得（ページ読み込み直後に一度だけ許可を取る） ==========
-    // initPC()はSocket経由（非ユーザー操作）で呼ばれるため、ここで先に取得しておく
-    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-      .then(stream => {
-        localStream = stream;
-        $('local-audio').srcObject = stream;
-      })
-      .catch(() => {
-        showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してから\nもう一度お試しください。');
-      });
-
-    // ========== スピーカー切替 ==========
-    // ユーザーのタップ（= ユーザージェスチャー）の中でAudioContextを同期的に作成・接続する
+    // ══════════════════════════════════════════
+    //  スピーカー切替
+    // ══════════════════════════════════════════
     function toggleSpeaker() {
       isSpeakerOn = !isSpeakerOn;
       $('speaker-btn').classList.toggle('active', isSpeakerOn);
       $('speaker-label').textContent = isSpeakerOn ? 'スピーカーON' : 'スピーカー';
 
       if (isSpeakerOn) {
-        // AudioContextをユーザージェスチャー内で同期的に作成（iOS要件）
+        stopAudioWatchdog();
         if (!_audioCtx || _audioCtx.state === 'closed') {
           try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
         }
         if (_audioCtx) _audioCtx.resume().catch(() => {});
-
         const audio = $('remote-audio');
         if (audio.srcObject && _audioCtx) {
-          // 既存ソースを切断してから新規接続
           if (_speakerSource) { try { _speakerSource.disconnect(); } catch {} }
           try {
             _speakerSource = _audioCtx.createMediaStreamSource(audio.srcObject);
             _speakerSource.connect(_audioCtx.destination);
           } catch {}
         }
-        // audio要素はミュートして二重再生を防ぐ（AudioContext側で鳴らす）
         $('remote-audio').muted = true;
         $('audio-banner').style.display = 'none';
       } else {
-        // スピーカーOFF：AudioContextを切断してaudio要素に戻す
         if (_speakerSource) { try { _speakerSource.disconnect(); } catch {} _speakerSource = null; }
         if (_audioCtx) { try { _audioCtx.suspend(); } catch {} }
         $('remote-audio').muted = false;
+        startAudioWatchdog();
       }
     }
 
-    // ページ読み込み時に音声バナーを表示
-    $('audio-banner').style.display = 'flex';
-
-    // ---- Socket ----
+    // ══════════════════════════════════════════
+    //  Socket
+    // ══════════════════════════════════════════
     const socket = io({ auth: { token }, transports: ['websocket'] });
 
     socket.on('connect', () => {
       socket.emit('joinCallRoom', { roomId, displayName: me.displayName || me.username, avatar: me.avatar || '' });
+    });
+
+    // Socket切断時に再接続
+    socket.on('disconnect', () => {
+      setTimeout(() => {
+        if (!socket.connected) socket.connect();
+      }, 1000);
     });
 
     let waitingTimeoutId = null;
@@ -293,7 +390,6 @@
     socket.on('callRoomWaiting', () => {
       $('status').textContent = '呼び出し中...';
       $('avatar').classList.add('ringing');
-      // 発信者: ピロリ音＋90秒タイムアウト（push通知リトライ6回×15秒に合わせる）
       if (isInit) {
         startPirori();
         waitingTimeoutId = setTimeout(() => {
@@ -316,7 +412,6 @@
         const name = other.displayName || '?';
         $('contact-name').textContent = name;
         const avatarEl = $('avatar');
-        // アバターを更新（画像優先、なければイニシャル）
         avatarEl.innerHTML = '';
         if (other.avatar) {
           const img = document.createElement('img');
@@ -344,38 +439,62 @@
     });
 
     socket.on('callAnswer', async ({ answer }) => {
-      try { if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer)); } catch {}
+      try {
+        if (pc && answer) {
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        }
+      } catch {}
     });
 
     socket.on('callIceCandidate', async ({ candidate }) => {
-      try { if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
+      try {
+        if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch {}
     });
 
     socket.on('callHangup', () => endCall(false));
 
-    // ---- WebRTC ----
-    async function initPC() {
-      // ページ読み込み時に取得済みのstreamを再利用（getUserMedia二重呼び出し＝毎回許可ダイアログを防ぐ）
-      if (!localStream) {
-        try {
-          localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-          $('local-audio').srcObject = localStream;
-        } catch {
-          showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してから\nもう一度お試しください。');
-          throw new Error('mic denied');
-        }
-      }
+    // ══════════════════════════════════════════
+    //  ICE再接続
+    // ══════════════════════════════════════════
+    async function doIceRestart() {
+      if (!pc || _iceRestartCount >= 3) return;
+      _iceRestartCount++;
+      try {
+        const offer = await pc.createOffer({ iceRestart: true });
+        await pc.setLocalDescription(offer);
+        socket.emit('callOffer', { roomId, offer });
+      } catch {}
+    }
 
+    // ══════════════════════════════════════════
+    //  WebRTC 初期化
+    // ══════════════════════════════════════════
+    async function initPC() {
+      // マイク準備完了を待ってから PeerConnection 作成
+      await waitLocalStream();
+      if (!localStream) throw new Error('mic denied');
+
+      if (pc) { try { pc.close(); } catch {} }
       pc = new RTCPeerConnection(iceConfig);
+      _iceRestartCount = 0;
+
+      // ローカルトラック追加
       localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
+      // リモートトラック受信
       pc.ontrack = e => {
         const audio = $('remote-audio');
         const stream = e.streams[0] || new MediaStream([e.track]);
+
+        // 同じstreamなら再設定しない（二重再生防止）
+        if (audio.srcObject && audio.srcObject.id === stream.id) return;
+
         audio.srcObject = stream;
-        audio.volume = 1;
-        audio.muted = isSpeakerOn; // スピーカーON中はaudio要素をミュート
-        // スピーカーモードがすでにONなら再接続
+        audio.volume    = 1.0;
+        audio.muted     = isSpeakerOn;
+
+        // スピーカーモードON中なら再接続
         if (isSpeakerOn && _audioCtx && _audioCtx.state === 'running') {
           if (_speakerSource) { try { _speakerSource.disconnect(); } catch {} }
           try {
@@ -383,64 +502,55 @@
             _speakerSource.connect(_audioCtx.destination);
           } catch {}
         }
+
         tryPlayAudio(audio);
-        onCallConnected();
       };
 
+      // ICE候補
       pc.onicecandidate = ({ candidate }) => {
         if (candidate) socket.emit('callIceCandidate', { roomId, candidate });
       };
 
-      // ICE接続状態で細かくステータス更新
+      // ICE接続状態
       pc.oniceconnectionstatechange = () => {
         if (!pc) return;
         const s = pc.iceConnectionState;
-        if (s === 'checking')     $('status').textContent = '接続中...';
-        if (s === 'connected' || s === 'completed') onCallConnected();
-        if (s === 'disconnected') $('status').textContent = '再接続中...';
-        if (s === 'failed')       showError('接続に失敗しました。\n両方ともWi-Fiに繋いで\nもう一度試してください。');
+        if (s === 'checking')    { $('status').textContent = '接続中...'; }
+        if (s === 'connected' || s === 'completed') {
+          if (_iceRestartTimer) { clearTimeout(_iceRestartTimer); _iceRestartTimer = null; }
+          _iceRestartCount = 0;
+          onCallConnected();
+          // 接続確立時に音声ウォッチドッグ起動
+          if (!isSpeakerOn) startAudioWatchdog();
+        }
+        if (s === 'disconnected') {
+          $('status').textContent = '再接続中...';
+          // 4秒後にICE再接続（発信者がオファーを送り直す）
+          if (_iceRestartTimer) clearTimeout(_iceRestartTimer);
+          if (isInit) _iceRestartTimer = setTimeout(doIceRestart, 4000);
+        }
+        if (s === 'failed') {
+          // 即座にICE再接続を試みる
+          if (isInit) doIceRestart();
+          else $('status').textContent = '接続が切れました';
+        }
+      };
+
+      // 接続状態（ICEとは別）
+      pc.onconnectionstatechange = () => {
+        if (!pc) return;
+        const s = pc.connectionState;
+        if (s === 'connected') {
+          onCallConnected();
+          if (!isSpeakerOn) {
+            // 接続確立直後も音声を確実に再生
+            const audio = $('remote-audio');
+            if (audio.srcObject) tryPlayAudio(audio);
+          }
+        }
+        if (s === 'failed' && isInit) doIceRestart();
       };
     }
-
-    function tryPlayAudio(audio) {
-      if (isSpeakerOn) return; // スピーカーON時はAudioContext側で再生するのでskip
-      audio.play().then(() => {
-        $('audio-banner').style.display = 'none';
-      }).catch(() => {
-        $('audio-banner').style.display = 'flex';
-      });
-    }
-
-    // 音声バナーのタップ：autoplay制限を解除してaudio要素で再生開始
-    function enableAudio() {
-      $('audio-banner').style.display = 'none';
-      // ユーザージェスチャー内でAudioContextを作成（iOS要件）
-      if (!_audioCtx || _audioCtx.state === 'closed') {
-        try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
-      }
-      if (_audioCtx) _audioCtx.resume().catch(() => {});
-
-      // ピロリ待機中だった場合はここで開始
-      if (_piroriPlaying && !_piroriTimer) _playPirori();
-
-      const audio = $('remote-audio');
-      if (!isSpeakerOn) {
-        audio.muted = false;
-        audio.volume = 1;
-        const p = audio.play();
-        if (p) p.catch(() => {});
-      }
-    }
-
-    // 画面タップでも音声再生を試みる
-    document.addEventListener('touchstart', () => {
-      const audio = $('remote-audio');
-      if (!isSpeakerOn && audio.srcObject && audio.paused) {
-        audio.play().then(() => {
-          $('audio-banner').style.display = 'none';
-        }).catch(() => {});
-      }
-    }, { passive: true });
 
     function onCallConnected() {
       if (timerStarted) return;
@@ -466,37 +576,41 @@
       }
     }
 
+    // ══════════════════════════════════════════
+    //  ミュート
+    // ══════════════════════════════════════════
     function toggleMute() {
       if (!localStream) return;
       isMuted = !isMuted;
       localStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
       $('mute-slash').style.display = isMuted ? 'block' : 'none';
-      $('mute-label').textContent = isMuted ? 'ミュート中' : 'ミュート';
+      $('mute-label').textContent   = isMuted ? 'ミュート中' : 'ミュート';
       $('mute-btn').classList.toggle('active', isMuted);
     }
 
+    // ══════════════════════════════════════════
+    //  通話終了
+    // ══════════════════════════════════════════
     function endCall(notify = true) {
       stopPirori();
+      stopAudioWatchdog();
+      if (_iceRestartTimer) { clearTimeout(_iceRestartTimer); _iceRestartTimer = null; }
       if (notify) socket.emit('callHangup', { roomId });
-      if (timerInterval) clearInterval(timerInterval);
-      if (localStream)   localStream.getTracks().forEach(t => t.stop());
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      if (localStream)   { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
       if (pc)            { pc.close(); pc = null; }
+      if (_speakerSource) { try { _speakerSource.disconnect(); } catch {} _speakerSource = null; }
 
-      // 通話時間を計算して表示
+      const audio = $('remote-audio');
+      if (audio) { audio.srcObject = null; }
+
       let durationText = '';
       if (timerSec > 0) {
-        const m = Math.floor(timerSec / 60);
-        const s = timerSec % 60;
+        const m = Math.floor(timerSec / 60), s = timerSec % 60;
         durationText = m > 0 ? `${m}分${s}秒` : `${s}秒`;
         $('status').textContent = `通話時間  ${durationText}`;
-
-        // チャットに通話時間を記録（LINE方式）
         if (partnerUserId) {
-          socket.emit('sendMessage', {
-            toUserId: partnerUserId,
-            text: `📞 通話  ${durationText}`,
-            file: null
-          });
+          socket.emit('sendMessage', { toUserId: partnerUserId, text: `📞 通話  ${durationText}`, file: null });
         }
       } else {
         $('status').textContent = '通話終了';
@@ -519,6 +633,9 @@
     }
 
     window.addEventListener('beforeunload', () => { if (pc) endCall(true); });
+
+    // 最初のタップで音声バナーを表示
+    $('audio-banner').style.display = 'flex';
   </script>
 </body>
 </html>
