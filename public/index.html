@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v13-timestamp-fix">
+  <meta name="app-version" content="v14-ringtone-louder">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -1658,34 +1658,55 @@
   // ========== 着信音（ループ） ==========
   function createRingtone() {
     const ctx = _getCtx();
-    if (!ctx) return { stop() {} };
-    let playing = true, timeoutId;
+    let playing = true;
+    let musicTimeout = null;
+    let vibTimeout = null;
 
-    // CHA着信メロディ: G5→E5→G5→E5→C5→G4（LINE風）＋ 少し大きめ
-    const melody = [
-      { f: 784, d: 0.13 }, { f: 659, d: 0.13 }, { f: 784, d: 0.13 }, { f: 659, d: 0.13 },
-      { f: 523, d: 0.22 }, { f: 392, d: 0.30 }
+    // 着信メロディ: triangle波（sine より音が通る）＋ 高音量
+    const notes = [
+      [880, 0.12], [1047, 0.12], [880, 0.12], [1047, 0.12], [1175, 0.22],
+      [880, 0.12], [1047, 0.12], [1175, 0.30]
     ];
 
-    function playSequence() {
-      if (!playing) return;
-      if (ctx.state === 'suspended') { ctx.resume().catch(() => {}); }
-      let t = ctx.currentTime + 0.05;
-      melody.forEach(({ f, d }) => {
-        _playNote(ctx, f, t, d, 0.38);
-        t += d + 0.02;
+    function playOnce() {
+      if (!playing || !ctx) return;
+      let t = ctx.currentTime + 0.04;
+      notes.forEach(([freq, dur]) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const comp = ctx.createDynamicsCompressor(); // 音割れ防止
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.75, t + 0.015); // 音量アップ
+        gain.gain.linearRampToValueAtTime(0, t + dur - 0.015);
+        osc.connect(gain); gain.connect(comp); comp.connect(ctx.destination);
+        osc.start(t); osc.stop(t + dur);
+        t += dur + 0.025;
       });
-      const total = melody.reduce((s, { d }) => s + d + 0.02, 0);
-      timeoutId = setTimeout(playSequence, (total + 0.55) * 1000);
+      const total = notes.reduce((s, [, d]) => s + d + 0.025, 0);
+      musicTimeout = setTimeout(playOnce, (total + 0.65) * 1000);
     }
 
-    ctx.resume().then(playSequence).catch(playSequence);
+    // バイブレーションをループ（応答/拒否まで継続）
+    function vibLoop() {
+      if (!playing) return;
+      if (navigator.vibrate) navigator.vibrate([600, 250, 600, 250, 600]);
+      vibTimeout = setTimeout(vibLoop, 2200);
+    }
+
+    if (ctx) {
+      const doPlay = () => { if (playing) playOnce(); };
+      ctx.state === 'suspended' ? ctx.resume().then(doPlay).catch(doPlay) : doPlay();
+    }
+    vibLoop();
 
     return {
       stop() {
         playing = false;
-        clearTimeout(timeoutId);
-        // コンテキストは閉じない（共有のため）
+        if (musicTimeout) clearTimeout(musicTimeout);
+        if (vibTimeout)   clearTimeout(vibTimeout);
+        if (navigator.vibrate) navigator.vibrate(0);
       }
     };
   }
@@ -1737,7 +1758,6 @@
     pendingJitsiUrl = signal?.jitsiUrl;
 
     ringtone = createRingtone();
-    if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
 
     // ページが非表示（バックグラウンド）のとき → Notification APIで直接通知し、
     // タップで app を前面に持ってくる
