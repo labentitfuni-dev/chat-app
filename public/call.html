@@ -129,11 +129,12 @@
   </div>
 
   <script>
-    const params = new URLSearchParams(location.search);
-    const roomId = params.get('room');
-    const isInit = params.get('initiator') === 'true';
-    const token  = localStorage.getItem('token');
-    const me     = JSON.parse(localStorage.getItem('user') || '{}');
+    const params   = new URLSearchParams(location.search);
+    const roomId   = params.get('room');
+    const isInit   = params.get('initiator') === 'true';
+    const calleeId = params.get('to') || null; // 発信者のみ：着信側のuserId（不在着信メッセージ用）
+    const token    = localStorage.getItem('token');
+    const me       = JSON.parse(localStorage.getItem('user') || '{}');
     const $      = id => document.getElementById(id);
 
     if (!roomId || !token) { location.href = '/'; }
@@ -395,7 +396,11 @@
         waitingTimeoutId = setTimeout(() => {
           waitingTimeoutId = null;
           stopPirori();
-          endCall(true);
+          // iOSはlocation.hrefで遷移するのでindex.htmlのsocketが消える
+          // そのためcall.html側でrejectCallを送る（Androidはindex.htmlが別タブで生きているのでスキップ）
+          const _isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+          if (calleeId && _isIOS) socket.emit('rejectCall', { toUserId: calleeId, reason: 'timeout' });
+          endCall(_isIOS ? false : true); // iOS: callHangup不要, Android: callHangupで部屋を閉じる
           $('status').textContent = '応答がありませんでした';
         }, 90000);
       }

@@ -46,7 +46,7 @@ app.use('/api/auth', require('./auth'));
 app.use('/api/upload', require('./upload'));
 app.use('/api/push', require('./push').router);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
-app.get('/api/version', (req, res) => res.json({ version: 'v24-reliability' }));
+app.get('/api/version', (req, res) => res.json({ version: 'v25-missed-call-ios' }));
 
 app.get('/api/ice-servers', async (req, res) => {
   try {

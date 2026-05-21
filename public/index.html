@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v24-reliability">
+  <meta name="app-version" content="v25-missed-call-ios">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -1801,8 +1801,8 @@
       name: contact.displayName || contact.username || '',
       avatar: contact.avatar || ''
     }));
-    // 発信者はすぐ通話ページへ
-    openCallPage(`/call?room=${roomId}&initiator=true`);
+    // 発信者はすぐ通話ページへ（calleeIdを渡してiOSでも不在着信を作れるように）
+    openCallPage(`/call?room=${roomId}&initiator=true&to=${contact.id}`);
 
     // 90秒で相手が応答しなければタイムアウト（15秒×6回リトライに合わせた配信遅延考慮）
     callTimeoutId = setTimeout(() => {
