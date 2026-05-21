@@ -74,27 +74,32 @@ function setupSocket(io) {
 
     socket.on('sendMessage', async ({ toUserId, text, file }) => {
       if ((!text && !file) || !toUserId) return;
-      const msg = await Message.create({
-        fromId: socket.userId, fromName: socket.username,
-        toId: toUserId, text: text || '',
-        file: file || null
-      });
-      const out = { ...msg.toObject(), id: msg._id.toString() };
-      socket.emit('newMessage', out);
-      const toSocketId = onlineUsers.get(toUserId);
-      if (toSocketId) {
-        io.to(toSocketId).emit('newMessage', out);
+      try {
+        const msg = await Message.create({
+          fromId: socket.userId, fromName: socket.username,
+          toId: toUserId, text: text || '',
+          file: file || null
+        });
+        const out = { ...msg.toObject(), id: msg._id.toString() };
+        socket.emit('newMessage', out);
+        const toSocketId = onlineUsers.get(toUserId);
+        if (toSocketId) {
+          io.to(toSocketId).emit('newMessage', out);
+        }
+        // オンライン・バックグラウンド問わず常にpushを送る（SWがフォアグラウンド時は表示を抑制）
+        const recipient = await User.findById(toUserId).lean();
+        const hideContent = recipient?.hideNotifContent;
+        sendPushNotification(toUserId, {
+          title: socket.username,
+          body: hideContent ? '新しいメッセージがあります' : (out.file ? '📎 ファイルが届きました' : out.text),
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          data: { fromId: socket.userId }
+        });
+      } catch (e) {
+        console.error('[sendMessage] error:', e.message);
+        socket.emit('sendError', { error: 'メッセージの送信に失敗しました' });
       }
-      // オンライン・バックグラウンド問わず常にpushを送る（SWがフォアグラウンド時は表示を抑制）
-      const recipient = await User.findById(toUserId).lean();
-      const hideContent = recipient?.hideNotifContent;
-      sendPushNotification(toUserId, {
-        title: socket.username,
-        body: hideContent ? '新しいメッセージがあります' : (out.file ? '📎 ファイルが届きました' : out.text),
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        data: { fromId: socket.userId }
-      });
     });
 
     socket.on('markRead', async ({ fromUserId }) => {

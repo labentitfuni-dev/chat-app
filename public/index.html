@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v20-input-bug-fix">
+  <meta name="app-version" content="v21-bug-fixes">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -1036,7 +1036,7 @@
           ${isOnline ? '<span class="online-dot"></span>' : ''}
         </div>
         <div class="contact-info">
-          <div class="contact-name">${u.displayName || u.username}</div>
+          <div class="contact-name">${escapeHtml(u.displayName || u.username)}</div>
           <div class="contact-status${isOnline?' online':''}"></div>
         </div>`;
       // アイコンタップ：1回で拡大、4連続で削除
@@ -1228,6 +1228,14 @@
 
   $('back-btn').onclick = () => { $('sidebar').classList.remove('hidden'); $('chat-panel').classList.remove('show'); };
 
+  // messageHistory の競合を防ぐためにリクエスト中のcontactIdを追跡
+  let _pendingHistoryId = null;
+
+  function requestMessages(contactId) {
+    _pendingHistoryId = contactId;
+    socket.emit('getMessages', { toUserId: contactId });
+  }
+
   function openChat(contact) {
     currentContact = contact;
     $('no-chat').style.display = 'none';
@@ -1239,14 +1247,7 @@
     renderFriends();
     if (!messages[contact.id]) messages[contact.id] = [];
     if (!socket?.connected) { renderMessages(); return; }
-    socket.emit('getMessages', { toUserId: contact.id });
-    const targetId = contact.id;
-    socket.once('messageHistory', msgs => {
-      if (currentContact?.id !== targetId) return;
-      messages[targetId] = msgs;
-      renderMessages();
-      socket.emit('markRead', { fromUserId: targetId });
-    });
+    requestMessages(contact.id);
   }
 
   // ========== 共有 AudioContext（ユーザー操作後に作成・維持） ==========
@@ -1682,6 +1683,7 @@
 
   async function doDeleteMessage(msgId, wrapEl) {
     if (!msgId) return;
+    if (!socket?.connected) { showToast('⚠️ オフライン中は削除できません'); return; }
     socket.emit('deleteMessage', { messageId: msgId });
     // ローカルから即削除
     if (currentContact) {
@@ -1774,6 +1776,7 @@
   }
 
   function startCall(contact) {
+    if (!socket?.connected) { showToast('⚠️ 接続中です。しばらく待ってください'); return; }
     const roomId = generateRoomId();
     const callPageUrl = `/call?room=${roomId}`;
     const fallbackUrl = `https://meet.jit.si/cha-${roomId}`;
@@ -2281,13 +2284,7 @@
     if (socket && !socket.connected) socket.connect();
     // 友達一覧はソケット reconnect 時に更新されるので不要。現チャットだけ更新
     if (currentContact && socket?.connected) {
-      socket.emit('getMessages', { toUserId: currentContact.id });
-      const targetId = currentContact.id;
-      socket.once('messageHistory', msgs => {
-        if (currentContact?.id !== targetId) return;
-        messages[targetId] = msgs;
-        renderMessages();
-      });
+      requestMessages(currentContact.id);
     }
   });
 
@@ -2302,20 +2299,22 @@
         location.reload();
       }
     });
+    // messageHistory は一元管理（socket.once の競合を防ぐ）
+    socket.on('messageHistory', msgs => {
+      const targetId = _pendingHistoryId;
+      _pendingHistoryId = null;
+      if (!targetId || currentContact?.id !== targetId) return;
+      messages[targetId] = msgs;
+      renderMessages();
+      socket.emit('markRead', { fromUserId: targetId });
+    });
+
     let _isFirstConnect = true;
     socket.on('connect', () => {
       if (_isFirstConnect) { _isFirstConnect = false; return; } // 初回はstartApp側で取得済み
       // 再接続時のみ友達一覧とメッセージを更新
       debouncedFetchFriends();
-      if (currentContact) {
-        socket.emit('getMessages', { toUserId: currentContact.id });
-        const targetId = currentContact.id;
-        socket.once('messageHistory', msgs => {
-          if (currentContact?.id !== targetId) return;
-          messages[targetId] = msgs;
-          renderMessages();
-        });
-      }
+      if (currentContact) requestMessages(currentContact.id);
     });
     socket.on('userOnline', ({ userId }) => { onlineSet.add(userId); updateFriendOnlineDot(userId, true); });
     socket.on('userOffline', ({ userId }) => { onlineSet.delete(userId); updateFriendOnlineDot(userId, false); });
@@ -2368,12 +2367,13 @@
       $('delete-chat-confirm').textContent = '削除中...';
       $('delete-chat-confirm').disabled = true;
       try {
+        if (!socket?.connected) throw new Error('offline');
         socket.emit('deleteChatHistory', { withUserId: currentContact.id });
         // ローカルも即クリア
         messages[currentContact.id] = [];
         renderMessages();
         showToast('トークを削除しました');
-      } catch { showToast('削除に失敗しました'); }
+      } catch { showToast('⚠️ 削除に失敗しました（オフライン）'); }
       finally {
         $('delete-chat-modal').style.display = 'none';
         $('delete-chat-confirm').textContent = '削除';
