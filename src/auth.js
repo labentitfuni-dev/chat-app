@@ -96,7 +96,7 @@ router.post('/add-friend', async (req, res) => {
     await User.findByIdAndUpdate(id, { $push: { friends: friend._id.toString() } });
     await User.findByIdAndUpdate(friend._id, { $push: { friends: id } });
 
-    res.json({ success: true, friend: { id: friend._id.toString(), username: friend.username, displayName: friend.displayName, friendCode: friend.friendCode } });
+    res.json({ success: true, friend: { id: friend._id.toString(), username: friend.username, displayName: friend.displayName, friendCode: friend.friendCode, avatar: friend.avatar || '' } });
   } catch (e) {
     console.error('add-friend error:', e.message);
     res.status(500).json({ error: 'エラーが発生しました' });

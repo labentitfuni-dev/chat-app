@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#06C755">
+  <meta name="theme-color" content="#3D9A6A">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,49 +14,41 @@
   <script src="/socket.io/socket.io.js"></script>
   <style>
     :root {
-      --green: #06C755;
-      --green-deep: #059444;
-      /* ヘッダー/主要面: 深みのあるダークグリーン */
-      --hdr: linear-gradient(160deg, #082e18 0%, #0d3f22 100%);
-      --hdr-solid: #0b3320;
-      /* アバター: 鮮やかなグリーングラデーション */
-      --avatar-bg: linear-gradient(135deg, #09d860 0%, #06C755 55%, #04a844 100%);
-      /* ボタン */
-      --btn-bg: linear-gradient(135deg, #08e060 0%, #06C755 100%);
-      --btn-shadow: 0 4px 16px rgba(6,199,85,0.32);
+      --green: #3D9A6A;
+      --green-deep: #2F7A54;
+      --hdr: #3D9A6A;
+      /* アバター・ボタン */
+      --avatar-bg: linear-gradient(135deg, #52B080 0%, #3D9A6A 55%, #2F7A54 100%);
+      --btn-bg: linear-gradient(135deg, #52B080 0%, #3D9A6A 100%);
+      --btn-shadow: 0 4px 16px rgba(61,154,106,0.30);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
-    body { background: #e8eaec; min-height: 100vh; display: flex; flex-direction: column; }
+    body { background: #f0f0f0; min-height: 100vh; display: flex; flex-direction: column; }
 
     /* ===== ローディング画面 ===== */
     #loading-screen {
       position: fixed; inset: 0; z-index: 999; color: white;
-      background: linear-gradient(160deg, #050e08 0%, #0a1f11 55%, #050e08 100%);
+      background: linear-gradient(150deg, #52B080 0%, #3D9A6A 60%, #2F7A54 100%);
       display: flex; flex-direction: column; justify-content: center; align-items: center;
     }
-    #loading-screen h1 {
-      font-size: 38px; font-weight: 800; letter-spacing: -0.8px;
-      margin-bottom: 6px;
-      background: linear-gradient(135deg, #ffffff 30%, #7aebb0 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    }
-    #loading-screen p { font-size: 13px; color: rgba(255,255,255,0.38); margin-bottom: 48px; font-weight: 400; letter-spacing: 0.6px; }
-    .spinner { width: 32px; height: 32px; border: 2.5px solid rgba(6,199,85,0.22); border-top-color: #06C755; border-radius: 50%; animation: spin 0.75s linear infinite; }
+    #loading-screen h1 { font-size: 40px; font-weight: 800; letter-spacing: -1px; margin-bottom: 6px; }
+    #loading-screen p { font-size: 13px; color: rgba(255,255,255,0.55); margin-bottom: 48px; font-weight: 400; letter-spacing: 0.8px; }
+    .spinner { width: 32px; height: 32px; border: 2.5px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.75s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ===== ログイン画面 ===== */
     #login-screen {
       flex: 1; min-height: 100vh;
-      background: linear-gradient(160deg, #071b0e 0%, #0d3020 50%, #071b0e 100%);
+      background: linear-gradient(150deg, #52B080 0%, #3D9A6A 60%, #2F7A54 100%);
       display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 16px;
     }
     .login-card {
       background: #ffffff; border-radius: 22px; padding: 34px 24px 28px;
       width: calc(100% - 32px); max-width: 340px;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.12);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08);
     }
-    .login-card h1 { text-align: center; font-size: 26px; font-weight: 800; color: #0d3020; margin-bottom: 4px; letter-spacing: -0.6px; }
+    .login-card h1 { text-align: center; font-size: 28px; font-weight: 800; color: var(--green); margin-bottom: 4px; letter-spacing: -0.8px; }
     .login-card p { text-align: center; color: #aaa; font-size: 14px; margin-bottom: 22px; }
     .login-card input { display: block; width: 100%; padding: 13px 16px; margin-bottom: 10px; border: 1.5px solid #eaeaea; border-radius: 12px; font-size: 16px; outline: none; color: #111; background: #fafafa; transition: border-color 0.18s, background 0.18s; -webkit-text-size-adjust: 100%; touch-action: manipulation; -webkit-user-select: auto; user-select: auto; }
     .login-card input:focus { border-color: var(--green); background: #fff; }
@@ -69,24 +61,24 @@
     #app-screen { flex: 1; display: none; flex-direction: row; height: 100vh; }
 
     /* ===== サイドバー ===== */
-    #sidebar { width: 300px; background: #f7f8f9; border-right: 1px solid rgba(0,0,0,0.09); display: flex; flex-direction: column; }
+    #sidebar { width: 300px; background: #fff; border-right: 1px solid rgba(0,0,0,0.08); display: flex; flex-direction: column; }
 
-    /* ヘッダー: 共通ダークグリーングラデーション */
+    /* ===== ヘッダー: 白ベース ===== */
     .tab-header {
-      background: var(--hdr); color: white;
+      background: #fff; color: #111;
       padding: 14px 16px 12px;
       display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
-      box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset;
+      border-bottom: 1px solid rgba(0,0,0,0.07);
     }
-    .tab-header h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+    .tab-header h2 { font-size: 18px; font-weight: 800; letter-spacing: -0.4px; color: var(--green); }
     .tab-header-btns { display: flex; gap: 6px; align-items: center; }
-    .tab-icon-btn { background: rgba(255,255,255,0.12); border: none; color: white; cursor: pointer; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
-    .tab-icon-btn:active { background: rgba(255,255,255,0.26); }
-    #install-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 12px; display: none; }
+    .tab-icon-btn { background: #f4f4f4; border: none; color: #555; cursor: pointer; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+    .tab-icon-btn:active { background: #e8e8e8; }
+    #install-btn { background: var(--green); border: none; color: white; cursor: pointer; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 12px; display: none; }
 
     /* ===== ボトムタブ ===== */
     #tab-bar { display: flex; background: white; border-top: 1px solid rgba(0,0,0,0.08); flex-shrink: 0; }
-    .tab-btn { flex: 1; padding: 10px 0 8px; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #c0c0c0; font-size: 10px; font-weight: 600; letter-spacing: 0.2px; transition: color 0.15s; }
+    .tab-btn { flex: 1; padding: 10px 0 8px; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #bbb; font-size: 10px; font-weight: 600; letter-spacing: 0.2px; transition: color 0.15s; }
     .tab-btn.active { color: var(--green); }
     .tab-btn svg { width: 24px; height: 24px; }
     .tab-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
@@ -94,11 +86,11 @@
 
     /* ===== 設定パネル ===== */
     #settings-panel { display: none; position: fixed; inset: 0; z-index: 150; }
-    #settings-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); }
-    #settings-box { position: absolute; top: 0; right: 0; width: 290px; height: 100%; background: #f2f3f5; display: flex; flex-direction: column; box-shadow: -12px 0 40px rgba(0,0,0,0.18); }
-    #settings-header { background: var(--hdr); color: white; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+    #settings-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(3px); }
+    #settings-box { position: absolute; top: 0; right: 0; width: 290px; height: 100%; background: #f2f3f5; display: flex; flex-direction: column; box-shadow: -8px 0 32px rgba(0,0,0,0.14); }
+    #settings-header { background: var(--green); color: white; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
     #settings-header h3 { flex: 1; font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
-    #settings-close { background: none; border: none; color: rgba(255,255,255,0.75); font-size: 22px; cursor: pointer; }
+    #settings-close { background: none; border: none; color: rgba(255,255,255,0.8); font-size: 22px; cursor: pointer; }
     .settings-section { padding: 20px 16px 8px; font-size: 10.5px; color: #aaa; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
     .settings-row { display: flex; align-items: center; padding: 14px 16px; background: white; border-bottom: 1px solid rgba(0,0,0,0.05); gap: 12px; }
     .settings-row:first-of-type { margin-top: 0; }
@@ -119,13 +111,13 @@
     #ios-banner-close { background: none; border: none; font-size: 18px; color: #bbb; cursor: pointer; flex-shrink: 0; }
     #notif-banner { display: none; background: #fffce8; border-bottom: 1px solid #f0d84a; padding: 10px 14px; font-size: 13px; color: #555; align-items: center; gap: 10px; }
     #notif-banner span { flex: 1; line-height: 1.5; }
-    #notif-banner-allow { background: var(--btn-bg); color: white; border: none; border-radius: 14px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 8px rgba(6,199,85,0.28); }
+    #notif-banner-allow { background: var(--btn-bg); color: white; border: none; border-radius: 14px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 8px rgba(61,154,106,0.28); }
     #notif-banner-close { background: none; border: none; font-size: 18px; color: #bbb; cursor: pointer; flex-shrink: 0; }
 
     /* ===== マイ情報 ===== */
     #my-info { padding: 14px 16px; background: white; border-bottom: 1px solid rgba(0,0,0,0.06); display: flex; align-items: center; gap: 12px; }
     #my-avatar-wrap { position: relative; flex-shrink: 0; cursor: pointer; }
-    #my-avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--avatar-bg); display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; font-weight: 700; overflow: hidden; box-shadow: 0 3px 10px rgba(6,199,85,0.28); }
+    #my-avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--avatar-bg); display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; font-weight: 700; overflow: hidden; box-shadow: 0 3px 10px rgba(61,154,106,0.28); }
     #my-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
     #my-avatar-edit { display: none; }
     #my-info-text { flex: 1; min-width: 0; }
@@ -139,8 +131,8 @@
     .contact-item { padding: 11px 16px; cursor: pointer; display: flex; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.04); background: white; transition: background 0.1s; margin-bottom: 1px; }
     .contact-item:active { background: #f2f2f2; }
     .contact-item.active { background: #eaf5ef; border-left: 3px solid var(--green); padding-left: 13px; }
-    .avatar { width: 50px; height: 50px; border-radius: 50%; background: var(--avatar-bg); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: 700; margin-right: 12px; flex-shrink: 0; position: relative; overflow: hidden; box-shadow: 0 2px 8px rgba(6,199,85,0.22); }
-    .online-dot { position: absolute; bottom: 1px; right: 1px; width: 12px; height: 12px; background: #3edf69; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+    .avatar { width: 50px; height: 50px; border-radius: 50%; background: var(--avatar-bg); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: 700; margin-right: 12px; flex-shrink: 0; position: relative; overflow: hidden; box-shadow: 0 2px 8px rgba(61,154,106,0.22); }
+    .online-dot { position: absolute; bottom: 1px; right: 1px; width: 12px; height: 12px; background: #3D9A6A; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
     .contact-info { flex: 1; min-width: 0; }
     .contact-name { font-size: 15px; font-weight: 600; color: #111; letter-spacing: -0.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .contact-status { font-size: 12px; color: #c0c0c0; margin-top: 1px; }
@@ -150,8 +142,8 @@
     #chat-panel { flex: 1; display: flex; flex-direction: column; }
     #chat-header { background: var(--hdr); color: white; padding: 12px 16px; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.22); }
     #chat-header h3 { flex: 1; font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
-    #call-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
-    #call-btn:active { background: rgba(255,255,255,0.18); }
+    #call-btn, #delete-chat-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+    #call-btn:active, #delete-chat-btn:active { background: rgba(255,255,255,0.18); }
     #no-chat { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ccc; gap: 14px; background: #f0f1f3; }
     #no-chat-add { background: var(--btn-bg); color: white; border: none; border-radius: 20px; padding: 10px 22px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: var(--btn-shadow); }
 
@@ -174,14 +166,35 @@
 
     /* ===== 吹き出し ===== */
     .msg-row { display: flex; align-items: flex-end; gap: 5px; margin-bottom: 1px; }
-    .msg-row.mine { flex-direction: row-reverse; }
+
+    /* 自分のメッセージ: Grid で左(時刻) 右(バブル) を確実に固定 */
+    .msg-row.mine {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      grid-template-areas: ". meta bubble";
+      align-items: end;
+      gap: 5px;
+    }
+    .msg-row.mine .msg-meta { grid-area: meta; align-items: flex-end; }
+    .msg-row.mine .bubble   { grid-area: bubble; }
+
     .bubble { max-width: 72%; padding: 9px 13px; font-size: 15px; line-height: 1.5; word-break: break-word; }
-    .bubble.mine { background: var(--green); color: white; border-radius: 18px 18px 4px 18px; box-shadow: 0 2px 8px rgba(6,199,85,0.30); }
+    .bubble.mine { background: var(--green); color: white; border-radius: 18px 18px 4px 18px; box-shadow: 0 2px 8px rgba(61,154,106,0.30); }
     .bubble.other { background: white; color: #111; border-radius: 18px 18px 18px 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.10); }
     .msg-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; padding-bottom: 2px; }
     .msg-row.other .msg-meta { align-items: flex-start; }
     .msg-time-text { font-size: 10px; color: rgba(0,0,0,0.32); white-space: nowrap; }
     .msg-read { font-size: 10px; color: var(--green-deep); font-weight: 700; white-space: nowrap; }
+
+    /* ===== 不在着信バブル ===== */
+    .bubble-missed-call {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 14px; border-radius: 18px;
+      background: #fdecea; color: #c62828;
+      font-size: 14px; font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+    }
+    .bubble-missed-call.mine { background: rgba(229,57,53,0.18); color: #c62828; }
 
     /* ===== アバター拡大モーダル ===== */
     #avatar-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 350; flex-direction: column; justify-content: center; align-items: center; gap: 16px; }
@@ -193,7 +206,7 @@
     #input-area { display: none; padding: 8px 10px; background: #eff0f1; border-top: 1px solid rgba(0,0,0,0.07); gap: 8px; align-items: center; }
     #msg-input { flex: 1; padding: 9px 14px; border: 1.5px solid #e0e0e0; border-radius: 22px; font-size: 15px; outline: none; resize: none; background: white; transition: border-color 0.18s; -webkit-text-size-adjust: 100%; }
     #msg-input:focus { border-color: var(--green); }
-    #send-btn { width: 38px; height: 38px; background: var(--btn-bg); color: white; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity 0.15s, transform 0.1s; box-shadow: 0 3px 12px rgba(6,199,85,0.42); }
+    #send-btn { width: 38px; height: 38px; background: var(--btn-bg); color: white; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity 0.15s, transform 0.1s; box-shadow: 0 3px 12px rgba(61,154,106,0.42); }
     #send-btn:active { opacity: 0.85; transform: scale(0.93); }
 
     /* ===== インストールガイド ===== */
@@ -203,7 +216,7 @@
     #install-guide-box .ig-sub { text-align: center; color: #aaa; font-size: 14px; margin-bottom: 24px; }
     .ig-step { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
     .ig-step:last-of-type { border-bottom: none; }
-    .ig-num { width: 28px; height: 28px; border-radius: 50%; background: var(--btn-bg); color: white; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(6,199,85,0.28); }
+    .ig-num { width: 28px; height: 28px; border-radius: 50%; background: var(--btn-bg); color: white; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(61,154,106,0.28); }
     .ig-text { font-size: 15px; color: #333; line-height: 1.4; }
     .ig-text strong { color: var(--green-deep); }
     .ig-icon { font-size: 22px; flex-shrink: 0; }
@@ -269,20 +282,45 @@
     .search-result .avatar { width: 40px; height: 40px; font-size: 16px; margin-right: 0; }
     .modal-error { color: #e53935; font-size: 13px; text-align: center; margin-bottom: 8px; }
 
-    /* ===== 通話モーダル ===== */
-    #call-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 200; }
-    .call-box { background: linear-gradient(160deg, #0d1f14 0%, #152a1c 100%); border-radius: 28px; padding: 48px 24px; width: 90%; max-width: 320px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 28px 88px rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.06); }
-    .call-avatar { width: 100px; height: 100px; border-radius: 50%; background: var(--avatar-bg); display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: 700; color: white; margin-bottom: 16px; position: relative; flex-shrink: 0; text-align: center; box-shadow: 0 6px 24px rgba(6,199,85,0.35); }
+    /* ===== 通話モーダル（LINEスタイル全画面） ===== */
+    #call-modal { display: none; position: fixed; inset: 0; z-index: 200; flex-direction: column; }
+    .call-box { width: 100%; height: 100%; border-radius: 0; padding: 0; max-width: none; background: linear-gradient(180deg, #1a2e22 0%, #0f1c14 55%, #0a1510 100%); display: flex; flex-direction: column; align-items: center; box-shadow: none; border: none; }
+    .call-top { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: max(72px, env(safe-area-inset-top,60px)) 24px 32px; }
+    .call-avatar { width: 120px; height: 120px; border-radius: 50%; background: var(--avatar-bg); display: flex; align-items: center; justify-content: center; font-size: 50px; font-weight: 700; color: white; margin-bottom: 28px; position: relative; flex-shrink: 0; text-align: center; box-shadow: 0 8px 36px rgba(61,154,106,0.40); overflow: hidden; }
     .call-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; overflow: hidden; }
-    .call-avatar.ringing::before, .call-avatar.ringing::after { content: ''; position: absolute; border-radius: 50%; border: 2px solid rgba(6,199,85,0.35); animation: ring-pulse 1.6s ease-out infinite; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-    .call-avatar.ringing::after { animation-delay: 0.6s; }
-    @keyframes ring-pulse { 0% { width: 100px; height: 100px; opacity: 1; } 100% { width: 190px; height: 190px; opacity: 0; } }
-    .call-name { color: white; font-size: 22px; font-weight: 700; margin-bottom: 6px; text-align: center; letter-spacing: -0.3px; }
-    .call-status { color: rgba(255,255,255,0.45); font-size: 14px; margin-bottom: 36px; text-align: center; }
-    .call-buttons { display: flex; justify-content: center; gap: 20px; }
-    .call-btn { padding: 14px 30px; border-radius: 40px; border: none; font-size: 15px; font-weight: 700; color: white; cursor: pointer; }
-    .call-btn.accept { background: var(--btn-bg); box-shadow: var(--btn-shadow); }
-    .call-btn.reject, .call-btn.end { background: #e53935; box-shadow: 0 4px 16px rgba(229,57,53,0.35); }
+    .call-avatar.ringing::before, .call-avatar.ringing::after { content: ''; position: absolute; border-radius: 50%; border: 2px solid rgba(61,154,106,0.40); animation: ring-pulse 1.8s ease-out infinite; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+    .call-avatar.ringing::after { animation-delay: 0.7s; }
+    @keyframes ring-pulse { 0% { width: 120px; height: 120px; opacity: 1; } 100% { width: 250px; height: 250px; opacity: 0; } }
+    .call-name { color: white; font-size: 28px; font-weight: 700; margin-bottom: 10px; text-align: center; letter-spacing: -0.4px; }
+    .call-status { color: rgba(255,255,255,0.50); font-size: 15px; text-align: center; }
+    .call-buttons { display: flex; justify-content: space-around; align-items: flex-end; width: 100%; padding: 24px 40px max(56px, env(safe-area-inset-bottom,40px)); }
+    .call-btn-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .call-btn-round { width: 74px; height: 74px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+    .call-btn-round:active { opacity: 0.82; transform: scale(0.93); }
+    .call-btn-round.accept { background: var(--green); box-shadow: 0 6px 28px rgba(61,154,106,0.55); }
+    .call-btn-round.reject, .call-btn-round.end { background: #e53935; box-shadow: 0 6px 28px rgba(229,57,53,0.50); }
+    .call-btn-label { color: rgba(255,255,255,0.72); font-size: 13px; font-weight: 500; }
+
+    /* ===== QRコード ===== */
+    .qr-tab-bar { display: flex; border-radius: 10px; overflow: hidden; border: 1.5px solid #eee; margin-bottom: 18px; }
+    .qr-tab-btn { flex: 1; padding: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .qr-tab-btn.active { background: var(--green); color: white; }
+    .qr-tab-btn:not(.active) { background: white; color: #888; }
+    #qr-code-container img { border-radius: 10px; display: block; }
+    .qr-scan-box { position: relative; border-radius: 14px; overflow: hidden; background: #111; min-height: 240px; display: flex; align-items: center; justify-content: center; }
+    #qr-video { width: 100%; display: block; }
+    .qr-scan-frame { position: absolute; width: 170px; height: 170px; border: 3px solid var(--green); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); pointer-events: none; }
+
+    /* ===== 診断モーダル ===== */
+    .diag-item { display: flex; align-items: center; gap: 12px; padding: 13px 16px; background: white; border-bottom: 1px solid rgba(0,0,0,0.05); }
+    .diag-icon { font-size: 18px; width: 26px; text-align: center; flex-shrink: 0; }
+    .diag-label { flex: 1; font-size: 14px; color: #222; font-weight: 500; }
+    .diag-status { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 10px; flex-shrink: 0; }
+    .diag-ok { background: #e8f5ee; color: #2F7A54; }
+    .diag-warn { background: #fff4e5; color: #c47a00; }
+    .diag-err { background: #fdecea; color: #c62828; }
+    .diag-fix-btn { font-size: 12px; font-weight: 600; color: var(--green); background: none; border: 1.5px solid var(--green); border-radius: 10px; padding: 3px 9px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+    .diag-fix-btn:active { background: #eef7f3; }
 
     /* ===== トースト ===== */
     #toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(20,20,20,0.92); color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; display: none; z-index: 500; white-space: nowrap; backdrop-filter: blur(8px); }
@@ -368,13 +406,16 @@
         <h2></h2>
         <div class="tab-header-btns">
           <button id="install-btn" title="ホーム画面に追加">📲 追加</button>
+          <button class="tab-icon-btn" id="qr-btn" title="QRコード">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h7v7H3V3zm2 2v3h3V5H5zm9-2h7v7h-7V3zm2 2v3h3V5h-3zM3 14h7v7H3v-7zm2 2v3h3v-3H5zm9 0h2v2h-2v-2zm-2 2h2v2h-2v-2zm4 0h2v2h-2v-2zm-2-4h2v2h-2v-2zm2 0h2v2h-2v-2zm2-2h2v2h-2v-2zm-4 0h2v2h-2v-2z"/></svg>
+          </button>
           <button class="tab-icon-btn" id="settings-btn" title="設定">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
           </button>
           <button class="tab-icon-btn" id="add-friend-btn" title="友達追加">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
           </button>
@@ -436,6 +477,9 @@
     <div id="chat-header" style="display:none">
       <button id="back-btn">←</button>
       <h3 id="chat-contact-name"></h3>
+      <button id="delete-chat-btn" title="トークを削除">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      </button>
       <button id="call-btn" title="音声通話">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
       </button>
@@ -498,6 +542,10 @@
       <div class="settings-row-label">ホーム画面に追加</div>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="#aaa"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
     </div>
+    <div class="settings-row" style="cursor:pointer" onclick="closeSettings();openDiagModal()">
+      <div class="settings-row-label">🔧 自動診断・バグ修正</div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#aaa"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+    </div>
     <button class="settings-logout" onclick="doLogout()">ログアウト</button>
   </div>
 </div>
@@ -524,6 +572,18 @@
   <div id="avatar-modal-name"></div>
   <button id="avatar-modal-edit-btn" onclick="event.stopPropagation(); _startAvatarEdit()">✏ 写真を変更</button>
   <div style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:10px;">タップして閉じる</div>
+</div>
+
+<!-- トーク削除確認モーダル -->
+<div class="modal-overlay" id="delete-chat-modal">
+  <div class="modal-box">
+    <h3>🗑 トークを削除</h3>
+    <p style="text-align:center;color:#888;font-size:14px;margin-bottom:20px"><strong id="delete-chat-name"></strong> とのトーク履歴をすべて削除しますか？<br><small style="color:#bbb">この操作は元に戻せません</small></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="$('delete-chat-modal').style.display='none'">キャンセル</button>
+      <button class="btn-confirm" style="background:#e53935" id="delete-chat-confirm">削除</button>
+    </div>
+  </div>
 </div>
 
 <!-- 友達削除確認モーダル -->
@@ -559,13 +619,55 @@
   </div>
 </div>
 
-<!-- 通話モーダル -->
+<!-- 通話モーダル (全画面 LINE スタイル) -->
 <div id="call-modal">
   <div class="call-box">
-    <div class="call-avatar" id="call-avatar-letter"></div>
-    <div class="call-name" id="call-modal-name"></div>
-    <div class="call-status" id="call-modal-status"></div>
+    <div class="call-top">
+      <div class="call-avatar" id="call-avatar-letter"></div>
+      <div class="call-name" id="call-modal-name"></div>
+      <div class="call-status" id="call-modal-status"></div>
+    </div>
     <div class="call-buttons" id="call-buttons"></div>
+  </div>
+</div>
+
+<!-- QRコードモーダル -->
+<div class="modal-overlay" id="qr-modal" onclick="if(event.target===this)closeQrModal()">
+  <div class="modal-box" style="width:min(340px,95vw);padding:24px 20px 20px">
+    <h3 style="margin-bottom:16px;text-align:center">QRコード</h3>
+    <div class="qr-tab-bar">
+      <button class="qr-tab-btn active" id="qr-tab-mine-btn" onclick="switchQrTab('mine')">自分のQR</button>
+      <button class="qr-tab-btn" id="qr-tab-scan-btn" onclick="switchQrTab('scan')">スキャン</button>
+    </div>
+    <div id="qr-mine-panel">
+      <div id="qr-code-container" style="display:flex;justify-content:center;margin-bottom:14px;min-height:170px;align-items:center"></div>
+      <p style="text-align:center;color:#aaa;font-size:13px;margin-bottom:6px">このQRを相手に見せてください</p>
+      <p style="text-align:center;font-size:22px;font-weight:800;letter-spacing:5px;color:#111" id="qr-display-code"></p>
+    </div>
+    <div id="qr-scan-panel" style="display:none">
+      <div class="qr-scan-box">
+        <video id="qr-video" autoplay muted playsinline></video>
+        <div class="qr-scan-frame"></div>
+      </div>
+      <p id="qr-scan-status" style="text-align:center;color:#aaa;font-size:13px;margin-top:10px">カメラを起動中...</p>
+    </div>
+    <button class="btn-cancel" onclick="closeQrModal()" style="width:100%;margin-top:18px;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;background:#f0f0f0;color:#666">閉じる</button>
+  </div>
+</div>
+
+<!-- 自動診断・修正モーダル -->
+<div class="modal-overlay" id="diag-modal" onclick="if(event.target===this)closeDiagModal()">
+  <div class="modal-box" style="width:min(380px,95vw);padding:0;overflow:hidden">
+    <div style="background:var(--green);color:white;padding:16px 20px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:20px">🔧</span>
+      <span style="font-size:16px;font-weight:700;flex:1">自動診断・修正</span>
+      <button onclick="closeDiagModal()" style="background:none;border:none;color:rgba(255,255,255,0.8);font-size:22px;cursor:pointer">✕</button>
+    </div>
+    <div id="diag-list" style="background:#f5f6f8"></div>
+    <div style="padding:14px 16px;display:flex;gap:8px">
+      <button id="diag-run-btn" onclick="runDiagnostics()" style="flex:1;padding:12px;background:var(--btn-bg);color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:var(--btn-shadow)">🔍 診断を実行</button>
+      <button id="diag-fix-all-btn" onclick="fixAllIssues()" style="flex:1;padding:12px;background:#e53935;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;display:none">⚡ すべて修正</button>
+    </div>
   </div>
 </div>
 
@@ -613,6 +715,8 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
   const $ = id => document.getElementById(id);
   let token = localStorage.getItem('token');
@@ -724,7 +828,7 @@
   // ========== アバター ==========
   function avatarInitial(name, size) {
     const letter = (name || '?')[0].toUpperCase();
-    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#06C755;display:flex;align-items:center;justify-content:center;color:white;font-size:${Math.floor(size*0.4)}px;font-weight:bold;">${letter}</div>`;
+    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#3D9A6A;display:flex;align-items:center;justify-content:center;color:white;font-size:${Math.floor(size*0.4)}px;font-weight:bold;">${letter}</div>`;
   }
 
   function avatarHtml(user, size = 44) {
@@ -739,11 +843,11 @@
     const el = $('my-avatar');
     const name = (me.displayName || me.username || '?')[0].toUpperCase();
     if (me.avatar) {
-      el.innerHTML = `<img src="${me.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.innerHTML='${name}';this.parentElement.style.background='#06C755'">`;
+      el.innerHTML = `<img src="${me.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.innerHTML='${name}';this.parentElement.style.background='#3D9A6A'">`;
       el.style.background = 'transparent';
     } else {
       el.innerHTML = name;
-      el.style.background = '#06C755';
+      el.style.background = '#3D9A6A';
     }
   }
 
@@ -917,8 +1021,8 @@
       div.dataset.uid = u.id;
       const isOnline = onlineSet.has(u.id);
       div.innerHTML = `
-        <div class="avatar" style="position:relative;background:${u.avatar?'transparent':'#06C755'}">
-          ${u.avatar ? `<img src="${u.avatar}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.style.background='#06C755';this.parentElement.insertAdjacentText('afterbegin','${(u.displayName||u.username||'?')[0].toUpperCase()}')">` : (u.displayName||u.username||'?')[0].toUpperCase()}
+        <div class="avatar" style="position:relative;background:${u.avatar?'transparent':'#3D9A6A'}">
+          ${u.avatar ? `<img src="${u.avatar}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.style.background='#3D9A6A';this.parentElement.insertAdjacentText('afterbegin','${(u.displayName||u.username||'?')[0].toUpperCase()}')">` : (u.displayName||u.username||'?')[0].toUpperCase()}
           ${isOnline ? '<span class="online-dot"></span>' : ''}
         </div>
         <div class="contact-info">
@@ -1193,6 +1297,21 @@
     const row = document.createElement('div');
     row.className = 'msg-row ' + (isMine ? 'mine' : 'other');
     const time = new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+
+    // 不在着信は専用スタイル
+    if (msg.isMissedCall) {
+      const missedCls = 'bubble-missed-call' + (isMine ? ' mine' : '');
+      if (isMine) {
+        row.style.cssText = 'display:flex;flex-direction:row;align-items:flex-end;justify-content:flex-end;gap:5px;margin-bottom:1px;';
+        row.innerHTML = `<div class="msg-meta" style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-bottom:2px;"><span class="msg-time-text">${time}</span></div><div class="${missedCls}">📵 不在着信</div>`;
+      } else {
+        row.innerHTML = `
+          <div class="${missedCls}">📵 不在着信</div>
+          <div class="msg-meta"><span class="msg-time-text">${time}</span></div>`;
+      }
+      return row;
+    }
+
     let content = '';
     if (msg.file) {
       if (msg.file.type === 'image') {
@@ -1207,12 +1326,9 @@
     }
     if (msg.text) content += `<span>${linkify(escapeHtml(msg.text))}</span>`;
     if (isMine) {
-      row.innerHTML = `
-        <div class="msg-meta">
-          ${showRead ? '<span class="msg-read">既読</span>' : ''}
-          <span class="msg-time-text">${time}</span>
-        </div>
-        <div class="bubble mine">${content}</div>`;
+      // inline styleで確実に左(時刻)→右(バブル)固定（CSSキャッシュに左右されない）
+      row.style.cssText = 'display:flex;flex-direction:row;align-items:flex-end;justify-content:flex-end;gap:5px;margin-bottom:1px;';
+      row.innerHTML = `<div class="msg-meta" style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;padding-bottom:2px;gap:2px;">${showRead ? '<span class="msg-read">既読</span>' : ''}<span class="msg-time-text">${time}</span></div><div class="bubble mine" style="max-width:72%;">${content}</div>`;
       const wrap = document.createElement('div');
       wrap.className = 'swipe-wrap';
       const delBtn = document.createElement('button');
@@ -1599,12 +1715,12 @@
     // 発信者はすぐ通話ページへ
     openCallPage(`/call?room=${roomId}&initiator=true`);
 
-    // 30秒で相手が応答しなければキャンセル
+    // 90秒で相手が応答しなければタイムアウト（15秒×6回リトライに合わせた配信遅延考慮）
     callTimeoutId = setTimeout(() => {
       const tid = currentCallContact?.id;
-      if (tid) socket.emit('rejectCall', { toUserId: tid });
+      if (tid) socket.emit('rejectCall', { toUserId: tid, reason: 'timeout' });
       closeCallModal();
-    }, 30000);
+    }, 90000);
   }
 
   function clearCallTimeout() {
@@ -1620,9 +1736,25 @@
     ringtone = createRingtone();
     if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
 
+    // ページが非表示（バックグラウンド）のとき → Notification APIで直接通知し、
+    // タップで app を前面に持ってくる
+    // tag を SW の push 通知と同じ 'incoming-call' にすることで二重表示を防ぐ
+    if (document.hidden && Notification?.permission === 'granted') {
+      try {
+        const n = new Notification('📞 ' + (caller.displayName || caller.username || fromName), {
+          body: '着信中... タップして応答してください',
+          icon: '/icon-192.png',
+          requireInteraction: true,
+          tag: 'incoming-call',
+          silent: false,
+        });
+        n.onclick = () => { window.focus(); n.close(); };
+      } catch {}
+    }
+
     showCallModal(caller, '着信中...', [
-      { label: '✓ 応答', cls: 'accept', fn: acceptIncomingCall },
-      { label: '✕ 拒否', cls: 'reject', fn: rejectIncomingCall }
+      { label: '拒否', cls: 'reject', fn: rejectIncomingCall },
+      { label: '応答', cls: 'accept', fn: acceptIncomingCall }
     ]);
     $('call-avatar-letter').classList.add('ringing');
   }
@@ -1647,7 +1779,7 @@
   function rejectIncomingCall() {
     if (ringtone) { ringtone.stop(); ringtone = null; }
     if (navigator.vibrate) navigator.vibrate(0);
-    socket.emit('rejectCall', { toUserId: currentCallContact?.id });
+    socket.emit('rejectCall', { toUserId: currentCallContact?.id, reason: 'rejected' });
     closeCallModal();
   }
 
@@ -1663,6 +1795,10 @@
     setTimeout(() => { t.style.display = 'none'; }, 3000);
   }
 
+  // SVGアイコン定義（通話ボタン用）
+  const _phoneIconSvg = `<svg width="30" height="30" viewBox="0 0 24 24" fill="white"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>`;
+  const _hangupIconSvg = `<svg width="30" height="30" viewBox="0 0 24 24" fill="white" style="transform:rotate(135deg)"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>`;
+
   function showCallModal(contact, status, buttons) {
     const avatarEl = $('call-avatar-letter');
     avatarEl.classList.remove('ringing');
@@ -1676,7 +1812,20 @@
     $('call-modal-status').textContent = status;
     const btns = $('call-buttons');
     btns.innerHTML = '';
-    buttons.forEach(b => { const btn = document.createElement('button'); btn.className = 'call-btn ' + b.cls; btn.textContent = b.label; btn.onclick = b.fn; btns.appendChild(btn); });
+    buttons.forEach(b => {
+      const wrap = document.createElement('div');
+      wrap.className = 'call-btn-wrap';
+      const btn = document.createElement('button');
+      btn.className = 'call-btn-round ' + b.cls;
+      btn.innerHTML = (b.cls === 'accept') ? _phoneIconSvg : _hangupIconSvg;
+      btn.onclick = b.fn;
+      const lbl = document.createElement('span');
+      lbl.className = 'call-btn-label';
+      lbl.textContent = b.label;
+      wrap.appendChild(btn);
+      wrap.appendChild(lbl);
+      btns.appendChild(wrap);
+    });
     $('call-modal').style.display = 'flex';
   }
 
@@ -1735,14 +1884,39 @@
       setInterval(() => reg.update(), 30 * 60 * 1000);
     }).catch(() => {});
 
-    // 通知タップ時にSWからpostMessageでチャットを開く指示を受け取る
+    // SWからのメッセージを受信（着信UI起動 / チャット開く）
     navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data?.type === 'open-chat' && event.data.fromId) {
-        openChatFromUserId(event.data.fromId);
+      const msg = event.data;
+      if (!msg) return;
+
+      if (msg.type === 'open-chat' && msg.fromId) {
+        // 通知タップ → チャットを開く
+        openChatFromUserId(msg.fromId);
         if (isMobile()) {
           $('sidebar').classList.add('hidden');
           $('chat-panel').classList.add('show');
         }
+
+      } else if (msg.type === 'incoming-call-push') {
+        // SW経由の着信通知 → ソケットが切れていてもモーダルを表示
+        if (!me) return;
+        if ($('call-modal').style.display === 'flex') return; // 既に表示中ならスキップ
+        const caller = friends.find(f => f.id === msg.fromId) || {
+          id: msg.fromId,
+          displayName: msg.fromName || '不明',
+          username:    msg.fromName || '不明'
+        };
+        pendingJitsiUrl   = msg.callUrl || null;
+        currentCallContact = caller;
+        ringtone = createRingtone();
+        if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+        showCallModal(caller, '着信中...', [
+          { label: '拒否', cls: 'reject', fn: rejectIncomingCall },
+          { label: '応答', cls: 'accept', fn: acceptIncomingCall }
+        ]);
+        $('call-avatar-letter').classList.add('ringing');
+        // アプリをフォアグラウンドへ（ブラウザにより効果は異なる）
+        try { window.focus(); } catch {}
       }
     });
   }
@@ -2083,12 +2257,21 @@
     });
     socket.on('newMessage', onNewMessage);
     socket.on('messageDeleted', ({ messageId }) => {
-      // サーバー確認後にローカルからも除去（既にdoDeleteMessageで削除済みの場合は何もしない）
-      if (currentContact) {
-        messages[currentContact.id] = (messages[currentContact.id] || []).filter(m =>
+      // 全会話を検索して削除（現在開いていないチャットも対象）
+      Object.keys(messages).forEach(contactId => {
+        const before = messages[contactId].length;
+        messages[contactId] = messages[contactId].filter(m =>
           (m.id || m._id?.toString()) !== messageId
         );
-      }
+        // 削除が発生した会話を今開いていれば再描画
+        if (messages[contactId].length < before && currentContact?.id === contactId) {
+          renderMessages();
+        }
+      });
+    });
+    socket.on('chatHistoryDeleted', ({ withUserId }) => {
+      messages[withUserId] = [];
+      if (currentContact?.id === withUserId) renderMessages();
     });
     socket.on('incomingCall', onIncomingCall);
     socket.on('callAccepted', onCallAccepted);
@@ -2104,6 +2287,31 @@
     });
   }
 
+  // ========== トーク削除 ==========
+  $('delete-chat-btn').onclick = openDeleteChatModal;
+
+  function openDeleteChatModal() {
+    if (!currentContact) return;
+    $('delete-chat-name').textContent = currentContact.displayName || currentContact.username;
+    $('delete-chat-modal').style.display = 'flex';
+    $('delete-chat-confirm').onclick = async () => {
+      $('delete-chat-confirm').textContent = '削除中...';
+      $('delete-chat-confirm').disabled = true;
+      try {
+        socket.emit('deleteChatHistory', { withUserId: currentContact.id });
+        // ローカルも即クリア
+        messages[currentContact.id] = [];
+        renderMessages();
+        showToast('トークを削除しました');
+      } catch { showToast('削除に失敗しました'); }
+      finally {
+        $('delete-chat-modal').style.display = 'none';
+        $('delete-chat-confirm').textContent = '削除';
+        $('delete-chat-confirm').disabled = false;
+      }
+    };
+  }
+
   $('ios-banner-close').onclick = () => {
     $('ios-install-banner').style.display = 'none';
     localStorage.setItem('ios-banner-dismissed', '1');
@@ -2113,6 +2321,207 @@
     $('notif-banner').style.display = 'none';
     localStorage.setItem('notif-banner-dismissed', '1');
   };
+
+  // ========== QRコード ==========
+  let _qrStream = null, _qrScanAnimId = null;
+
+  $('qr-btn').onclick = openQrModal;
+
+  function openQrModal() {
+    if (!me) return;
+    $('qr-modal').style.display = 'flex';
+    switchQrTab('mine');
+  }
+
+  function closeQrModal() {
+    $('qr-modal').style.display = 'none';
+    stopQrScan();
+  }
+
+  function switchQrTab(tab) {
+    const isMine = tab === 'mine';
+    $('qr-mine-panel').style.display = isMine ? 'block' : 'none';
+    $('qr-scan-panel').style.display = isMine ? 'none' : 'block';
+    $('qr-tab-mine-btn').classList.toggle('active', isMine);
+    $('qr-tab-scan-btn').classList.toggle('active', !isMine);
+    if (isMine) { stopQrScan(); generateMyQr(); }
+    else { startQrScan(); }
+  }
+
+  function generateMyQr() {
+    const container = $('qr-code-container');
+    container.innerHTML = '<span style="color:#bbb;font-size:13px">生成中...</span>';
+    if (typeof qrcode === 'undefined') {
+      container.textContent = 'ライブラリ読込中...';
+      return;
+    }
+    try {
+      const qr = qrcode(4, 'L');
+      qr.addData('cha://add/' + me.friendCode);
+      qr.make();
+      container.innerHTML = qr.createImgTag(5, 12);
+      const img = container.querySelector('img');
+      if (img) { img.style.borderRadius = '10px'; img.style.display = 'block'; }
+      $('qr-display-code').textContent = me.friendCode;
+    } catch (e) {
+      container.textContent = 'QR生成に失敗しました';
+    }
+  }
+
+  async function startQrScan() {
+    $('qr-scan-status').textContent = 'カメラを起動中...';
+    try {
+      _qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      const video = $('qr-video');
+      video.srcObject = _qrStream;
+      await video.play();
+      $('qr-scan-status').textContent = 'QRコードにカメラを向けてください';
+      const canvas = document.createElement('canvas');
+      const ctx2d = canvas.getContext('2d');
+      function scan() {
+        if (!_qrStream) return;
+        if (video.readyState >= 2) {
+          canvas.width = video.videoWidth || 1;
+          canvas.height = video.videoHeight || 1;
+          ctx2d.drawImage(video, 0, 0);
+          try {
+            const imgData = ctx2d.getImageData(0, 0, canvas.width, canvas.height);
+            if (typeof jsQR !== 'undefined') {
+              const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
+              if (code) {
+                let friendCode = code.data;
+                if (friendCode.startsWith('cha://add/')) friendCode = friendCode.slice(10);
+                if (/^\d{6}$/.test(friendCode)) {
+                  stopQrScan();
+                  closeQrModal();
+                  openAddFriendModal();
+                  setTimeout(() => { $('friend-code-input').value = friendCode; $('search-btn').click(); }, 150);
+                  return;
+                }
+              }
+            }
+          } catch {}
+        }
+        _qrScanAnimId = requestAnimationFrame(scan);
+      }
+      _qrScanAnimId = requestAnimationFrame(scan);
+    } catch (e) {
+      $('qr-scan-status').textContent = 'カメラへのアクセスを許可してください';
+    }
+  }
+
+  function stopQrScan() {
+    if (_qrScanAnimId) { cancelAnimationFrame(_qrScanAnimId); _qrScanAnimId = null; }
+    if (_qrStream) { _qrStream.getTracks().forEach(t => t.stop()); _qrStream = null; }
+    const v = $('qr-video');
+    if (v) v.srcObject = null;
+  }
+
+  // ========== 自動診断・バグ修正 ==========
+  function openDiagModal() {
+    $('diag-modal').style.display = 'flex';
+    $('diag-list').innerHTML = '<div style="padding:20px;text-align:center;color:#aaa;font-size:14px">「診断を実行」を押してください</div>';
+    $('diag-fix-all-btn').style.display = 'none';
+  }
+  function closeDiagModal() { $('diag-modal').style.display = 'none'; }
+
+  async function runDiagnostics() {
+    const btn = $('diag-run-btn');
+    btn.textContent = '診断中...';
+    btn.disabled = true;
+    const list = $('diag-list');
+    list.innerHTML = '';
+
+    const checks = [];
+
+    // 1. WebSocket接続
+    const wsOk = socket?.connected;
+    checks.push({ icon: '🔌', label: 'WebSocket接続', status: wsOk ? 'ok' : 'err', text: wsOk ? '接続中' : '切断されています', fixLabel: wsOk ? null : '再接続', fix: wsOk ? null : () => { if (socket) socket.connect(); showToast('再接続を試みています...'); } });
+
+    // 2. 通知許可
+    const notifPerm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+    const notifOk = notifPerm === 'granted';
+    const notifDenied = notifPerm === 'denied';
+    checks.push({ icon: '🔔', label: 'プッシュ通知許可', status: notifOk ? 'ok' : (notifDenied ? 'err' : 'warn'), text: notifOk ? '許可済み' : (notifDenied ? 'ブロック中（ブラウザ設定で解除を）' : '未許可'), fixLabel: (!notifOk && !notifDenied) ? '許可する' : null, fix: (!notifOk && !notifDenied) ? requestNotifPermission : null });
+
+    // 3. Service Worker
+    let swStatus = 'unsupported', swText = '非対応', swFix = null, swFixLabel = null;
+    if ('serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+        if (!reg) { swStatus = 'err'; swText = '未登録'; swFixLabel = '登録する'; swFix = () => navigator.serviceWorker.register('/sw.js').then(() => showToast('SW登録しました')); }
+        else if (reg.active) { swStatus = 'ok'; swText = `アクティブ (v${reg.active.scriptURL})`; }
+        else if (reg.installing || reg.waiting) { swStatus = 'warn'; swText = 'インストール中'; }
+        else { swStatus = 'warn'; swText = '状態不明'; }
+      } catch { swStatus = 'err'; swText = '取得エラー'; }
+    } else { swStatus = 'err'; swText = 'このブラウザは非対応'; }
+    checks.push({ icon: '⚙️', label: 'Service Worker', status: swStatus, text: swText, fixLabel: swFixLabel, fix: swFix });
+
+    // 4. プッシュ購読
+    let pushStatus = 'err', pushText = '購読なし', pushFix = null, pushFixLabel = null;
+    if ('serviceWorker' in navigator && 'PushManager' in window && notifOk) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) { pushStatus = 'ok'; pushText = '購読済み'; }
+        else { pushStatus = 'warn'; pushText = '未購読'; pushFixLabel = '再登録'; pushFix = async () => { await subscribePush(await navigator.serviceWorker.ready); showToast('プッシュを再登録しました'); runDiagnostics(); }; }
+      } catch { pushStatus = 'err'; pushText = '確認エラー'; }
+    } else if (!notifOk) { pushStatus = 'warn'; pushText = '通知未許可のためスキップ'; }
+    else { pushStatus = 'err'; pushText = 'PushManager非対応'; }
+    checks.push({ icon: '📡', label: 'プッシュ購読', status: pushStatus, text: pushText, fixLabel: pushFixLabel, fix: pushFix });
+
+    // 5. ローカルストレージ / トークン
+    const hasToken = !!localStorage.getItem('token');
+    const hasUser = !!localStorage.getItem('user');
+    checks.push({ icon: '🗄️', label: 'ローカルデータ', status: (hasToken && hasUser) ? 'ok' : 'warn', text: (hasToken && hasUser) ? 'トークン・ユーザー情報あり' : (hasToken ? 'ユーザー情報なし' : 'トークンなし') });
+
+    // 6. ネットワーク
+    const online = navigator.onLine;
+    checks.push({ icon: '🌐', label: 'ネットワーク', status: online ? 'ok' : 'err', text: online ? 'オンライン' : 'オフライン', fixLabel: !online ? 'ページ再読込' : null, fix: !online ? () => location.reload() : null });
+
+    // 7. JS エラーログ（_diagErrors に蓄積）
+    const errCount = window._diagErrors?.length || 0;
+    checks.push({ icon: '🐛', label: 'JSエラー（起動後）', status: errCount === 0 ? 'ok' : 'warn', text: errCount === 0 ? 'エラーなし' : `${errCount}件のエラー`, fixLabel: errCount > 0 ? 'ログをクリア' : null, fix: errCount > 0 ? () => { window._diagErrors = []; runDiagnostics(); } : null, detail: errCount > 0 ? window._diagErrors.slice(-3).join('\n') : null });
+
+    // 描画
+    const hasIssues = checks.some(c => c.status !== 'ok');
+    $('diag-fix-all-btn').style.display = hasIssues ? 'block' : 'none';
+    window._diagChecks = checks;
+
+    checks.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'diag-item';
+      const statusCls = c.status === 'ok' ? 'diag-ok' : (c.status === 'warn' ? 'diag-warn' : 'diag-err');
+      const statusText = c.status === 'ok' ? '✓ 正常' : (c.status === 'warn' ? '⚠ 警告' : '✕ 異常');
+      div.innerHTML = `<span class="diag-icon">${c.icon}</span><div style="flex:1;min-width:0"><div class="diag-label">${c.label}</div><div style="font-size:11px;color:#aaa;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.text}">${c.text}</div>${c.detail ? `<div style="font-size:10px;color:#e53935;margin-top:2px;white-space:pre-wrap;word-break:break-all;max-height:40px;overflow:hidden">${escapeHtml(c.detail)}</div>` : ''}</div><span class="diag-status ${statusCls}">${statusText}</span>${c.fix ? `<button class="diag-fix-btn" onclick="(${c.fix.toString()})()">${c.fixLabel}</button>` : ''}`;
+      list.appendChild(div);
+    });
+
+    btn.textContent = '🔍 診断を実行';
+    btn.disabled = false;
+  }
+
+  async function fixAllIssues() {
+    const checks = window._diagChecks || [];
+    for (const c of checks) {
+      if (c.status !== 'ok' && c.fix) {
+        try { await c.fix(); } catch {}
+      }
+    }
+    showToast('修正を実行しました');
+    setTimeout(runDiagnostics, 800);
+  }
+
+  // グローバルエラーをキャプチャして診断用に記録
+  window._diagErrors = [];
+  window.addEventListener('error', e => {
+    window._diagErrors.push(`[${new Date().toLocaleTimeString()}] ${e.message} (${e.filename?.split('/').pop()}:${e.lineno})`);
+    if (window._diagErrors.length > 20) window._diagErrors.shift();
+  });
+  window.addEventListener('unhandledrejection', e => {
+    window._diagErrors.push(`[${new Date().toLocaleTimeString()}] Unhandled: ${e.reason?.message || e.reason}`);
+    if (window._diagErrors.length > 20) window._diagErrors.shift();
+  });
 </script>
 </body>
 </html>

@@ -4,8 +4,8 @@
   "description": "チャット & 音声通話アプリ",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#06C755",
-  "theme_color": "#06C755",
+  "background_color": "#3D9A6A",
+  "theme_color": "#3D9A6A",
   "orientation": "portrait",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },

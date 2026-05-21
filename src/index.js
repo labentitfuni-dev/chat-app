@@ -9,30 +9,34 @@ const { connectDB } = require('./db');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
 
-app.use(cors());
+// 本番では ALLOWED_ORIGIN 環境変数でオリジンを制限（例: https://cha.example.com）
+// 未設定の場合は開発用に全許可
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
+const io = new Server(server, { cors: { origin: ALLOWED_ORIGIN, methods: ['GET', 'POST'] } });
+
+app.use(cors({ origin: ALLOWED_ORIGIN }));
 app.use(express.json());
 
-// index.html / call.html は常に最新版を返す（スマホのキャッシュ対策）
+// HTML / SW は常に最新版を返す（スマホ・PWAのキャッシュ対策）
+const NO_CACHE = { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' };
 app.get('/', (req, res) => {
-  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set(NO_CACHE);
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
 app.get('/call', (req, res) => {
-  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set(NO_CACHE);
   res.sendFile(path.join(__dirname, '..', 'public', 'call.html'));
 });
 
 app.get('/google-callback', (req, res) => {
-  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set(NO_CACHE);
   res.sendFile(path.join(__dirname, '..', 'public', 'google-callback.html'));
 });
 
-// sw.js は絶対にキャッシュさせない
 app.get('/sw.js', (req, res) => {
-  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set(NO_CACHE);
   res.sendFile(path.join(__dirname, '..', 'public', 'sw.js'));
 });
 

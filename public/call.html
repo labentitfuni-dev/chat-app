@@ -285,7 +285,7 @@
     const socket = io({ auth: { token }, transports: ['websocket'] });
 
     socket.on('connect', () => {
-      socket.emit('joinCallRoom', { roomId, displayName: me.displayName || me.username });
+      socket.emit('joinCallRoom', { roomId, displayName: me.displayName || me.username, avatar: me.avatar || '' });
     });
 
     let waitingTimeoutId = null;
@@ -293,7 +293,7 @@
     socket.on('callRoomWaiting', () => {
       $('status').textContent = '呼び出し中...';
       $('avatar').classList.add('ringing');
-      // 発信者: ピロリ音＋60秒タイムアウト
+      // 発信者: ピロリ音＋90秒タイムアウト（push通知リトライ6回×15秒に合わせる）
       if (isInit) {
         startPirori();
         waitingTimeoutId = setTimeout(() => {
@@ -301,7 +301,7 @@
           stopPirori();
           endCall(true);
           $('status').textContent = '応答がありませんでした';
-        }, 60000);
+        }, 90000);
       }
       if (navigator.vibrate) navigator.vibrate([400, 300, 400, 300, 400]);
     });
@@ -313,12 +313,19 @@
       const other = users.find(u => u.userId !== me.id);
       if (other) {
         partnerUserId = other.userId;
-        if (other.displayName) {
-          $('contact-name').textContent = other.displayName;
-          const avatarEl = $('avatar');
-          if (!avatarEl.querySelector('img')) {
-            avatarEl.textContent = other.displayName[0].toUpperCase();
-          }
+        const name = other.displayName || '?';
+        $('contact-name').textContent = name;
+        const avatarEl = $('avatar');
+        // アバターを更新（画像優先、なければイニシャル）
+        avatarEl.innerHTML = '';
+        if (other.avatar) {
+          const img = document.createElement('img');
+          img.src = other.avatar;
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+          img.onerror = () => { avatarEl.innerHTML = ''; avatarEl.textContent = name[0].toUpperCase(); };
+          avatarEl.appendChild(img);
+        } else {
+          avatarEl.textContent = name[0].toUpperCase();
         }
       }
       $('status').textContent = '接続中...';

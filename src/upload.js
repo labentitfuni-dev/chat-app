@@ -19,11 +19,22 @@ const storage = multer.diskStorage({
   }
 });
 
+// 許可する拡張子（実行ファイル等をブロック）
+const BLOCKED_EXT = new Set([
+  '.exe', '.bat', '.cmd', '.com', '.msi', '.ps1', '.vbs', '.js', '.jse',
+  '.sh', '.bash', '.zsh', '.fish', '.py', '.rb', '.pl', '.php',
+  '.jar', '.class', '.war', '.ear', '.apk', '.ipa',
+  '.scr', '.pif', '.cpl', '.reg', '.inf', '.lnk', '.hta'
+]);
+
 const upload = multer({
   storage,
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
   fileFilter: (req, file, cb) => {
-    // 画像・動画・PDF・一般ファイル全て許可
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (BLOCKED_EXT.has(ext)) {
+      return cb(new Error('このファイル形式はアップロードできません'));
+    }
     cb(null, true);
   }
 });
@@ -40,6 +51,7 @@ router.post('/', (req, res) => {
   upload.single('file')(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'ファイルサイズは20MB以下にしてください' });
+      if (err.message === 'このファイル形式はアップロードできません') return res.status(400).json({ error: err.message });
       return res.status(400).json({ error: 'アップロードに失敗しました' });
     }
     if (!req.file) return res.status(400).json({ error: 'ファイルがありません' });

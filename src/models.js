@@ -19,6 +19,7 @@ const messageSchema = new mongoose.Schema({
   file:     { type: Object, default: null },
   read:            { type: Boolean, default: false },
   deletedBySender: { type: Boolean, default: false },
+  isMissedCall:    { type: Boolean, default: false },
 }, { timestamps: true });
 
 const pushSubSchema = new mongoose.Schema({

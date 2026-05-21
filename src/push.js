@@ -43,15 +43,22 @@ router.post('/subscribe', async (req, res) => {
   }
 });
 
-async function sendPushNotification(toUserId, payload) {
+async function sendPushNotification(toUserId, payload, opts = {}) {
   const docs = await PushSub.find({ userId: toUserId });
   if (!docs.length) return;
 
+  // urgency: 'high' → バッテリー節約モードでも即時配信（着信通知に必須）
+  // TTL: 有効期限（秒）。0だと端末オフライン時に破棄される
+  const pushOptions = {
+    urgency: opts.urgency || 'normal',
+    TTL:     opts.TTL !== undefined ? opts.TTL : 86400,
+  };
+
   for (const doc of docs) {
     try {
-      await webpush.sendNotification(doc.subscription, JSON.stringify(payload));
+      await webpush.sendNotification(doc.subscription, JSON.stringify(payload), pushOptions);
     } catch (e) {
-      console.error(`[push] sendNotification failed for user ${toUserId}: status=${e.statusCode} msg=${e.message}`);
+      console.error(`[push] sendNotification failed for user ${toUserId}: status=${e.statusCode} urgency=${pushOptions.urgency} msg=${e.message}`);
       if (e.statusCode === 410 || e.statusCode === 404 || e.statusCode === 401) {
         await PushSub.deleteOne({ _id: doc._id });
         console.log(`[push] deleted stale subscription for user ${toUserId}`);
