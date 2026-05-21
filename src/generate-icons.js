@@ -2,24 +2,22 @@ const fs   = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const ICON_VERSION = 2; // bump to force regeneration
+const ICON_VERSION = 4; // bump to force regeneration
 
 function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
 
 function makePNG(size) {
   const W = size, H = size;
   const cx = W / 2, cy = H / 2;
-
-  // グラデーション: 左上 #18e070 → 右下 #04a040
-  const topR = 0x07, topG = 0xd4, topB = 0x5a;
-  const botR = 0x04, botG = 0x97, botB = 0x3c;
-
   const buf = Buffer.alloc(W * H * 4);
 
-  // Step1: グラデーション背景
+  // ── Step1: 暗いグリーングラデーション背景 (アプリ内の色に統一) ──
+  // #0d1f14 → #04100a (左上→右下)
+  const topR = 0x0d, topG = 0x1f, topB = 0x14;
+  const botR = 0x04, botG = 0x10, botB = 0x0a;
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      const t = (x + y) / (W + H - 2); // 左上→右下グラデーション
+      const t = (x + y) / (W + H - 2);
       const i = (y * W + x) * 4;
       buf[i]     = lerp(topR, botR, t);
       buf[i + 1] = lerp(topG, botG, t);
@@ -28,68 +26,85 @@ function makePNG(size) {
     }
   }
 
-  // Step2: 白い光沢ハイライト (左上1/3付近に薄い白円)
-  const glowCX = W * 0.35, glowCY = H * 0.28, glowR = W * 0.55;
+  // ── Step2: 中央ラジアルグロー (#3D9A6A) ──
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      const dx = x - glowCX, dy = y - glowCY;
+      const dx = x - cx, dy = y - cy;
       const dist = Math.sqrt(dx * dx + dy * dy);
+      const glowR = W * 0.56;
       if (dist < glowR) {
-        const alpha = (1 - dist / glowR) * 0.13; // 最大13%の白みがけ
+        const alpha = Math.pow(1 - dist / glowR, 1.6) * 0.28;
         const i = (y * W + x) * 4;
-        buf[i]     = Math.min(255, buf[i]     + Math.round(255 * alpha));
-        buf[i + 1] = Math.min(255, buf[i + 1] + Math.round(255 * alpha));
-        buf[i + 2] = Math.min(255, buf[i + 2] + Math.round(255 * alpha));
+        buf[i]     = Math.min(255, buf[i]     + Math.round(0x3d * alpha));
+        buf[i + 1] = Math.min(255, buf[i + 1] + Math.round(0x9a * alpha));
+        buf[i + 2] = Math.min(255, buf[i + 2] + Math.round(0x6a * alpha));
       }
     }
   }
 
-  // Step3: メインチャットバブル（大、右寄り気味）
-  const bw = W * 0.58, bh = H * 0.44;
-  const bx = cx - bw * 0.45, by = cy - bh * 0.60;
-  const br = bh * 0.28;
-  drawRoundRect(buf, W, H, bx, by, bw, bh, br, 255, 255, 255, 255);
+  // ── Step3: 太い「C」アーク（白・中央より少し上） ──
+  // C の開口部は右側。上下にキャップ付きで「CHA」の C を表現
+  const cCX = cx + W * 0.03;
+  const cCY = cy - H * 0.04;
+  const outerR = W * 0.305;
+  const innerR = W * 0.175;
+  const openAngle = Math.PI * 0.37; // 右側開口の角度
 
-  // バブルの尻尾（右下）
-  const tx1 = bx + bw * 0.65, ty1 = by + bh;
-  const tx2 = bx + bw * 0.88, ty2 = by + bh;
-  const tx3 = bx + bw * 0.78, ty3 = by + bh + H * 0.10;
-  drawTriangle(buf, W, H, tx1, ty1, tx2, ty2, tx3, ty3, 255, 255, 255, 255);
-
-  // Step4: サブチャットバブル（小、左下）
-  const sw = W * 0.40, sh = H * 0.28;
-  const sx = cx - bw * 0.45 - sw * 0.1, sy = by + bh + H * 0.06;
-  const sr = sh * 0.3;
-  // サブバブルは半透明白 (255,255,255,200)
-  drawRoundRect(buf, W, H, sx, sy, sw, sh, sr, 255, 255, 255, 200);
-
-  // サブバブルの尻尾（左下）
-  const stx1 = sx + sw * 0.10, sty1 = sy + sh;
-  const stx2 = sx + sw * 0.30, sty2 = sy + sh;
-  const stx3 = sx + sw * 0.12, sty3 = sy + sh + H * 0.07;
-  drawTriangle(buf, W, H, stx1, sty1, stx2, sty2, stx3, sty3, 255, 255, 255, 200);
-
-  // Step5: メインバブル内に3つのドット
-  const dotY = by + bh * 0.50;
-  const dotR = W * 0.038;
-  const dotSpacing = W * 0.11;
-  const dotStartX = bx + bw * 0.28;
-  const dotColor = [0x06, 0xC7, 0x55, 255]; // グリーンドット
-  for (let d = 0; d < 3; d++) {
-    const dotCX = dotStartX + d * dotSpacing;
-    drawCircle(buf, W, H, dotCX, dotY, dotR, dotColor[0], dotColor[1], dotColor[2], dotColor[3]);
+  for (let py = 0; py < H; py++) {
+    for (let px = 0; px < W; px++) {
+      const dx = px - cCX, dy = py - cCY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist >= innerR && dist <= outerR) {
+        const angle = Math.atan2(dy, dx);
+        if (angle < -openAngle || angle > openAngle) {
+          setPixel(buf, W, px, py, 255, 255, 255, 255);
+        }
+      }
+    }
   }
+  // C の上下キャップ（丸いエンド）
+  const capR   = (outerR - innerR) / 2;
+  const capMid = (outerR + innerR) / 2;
+  drawCircle(buf, W, H,
+    cCX + Math.cos(-openAngle) * capMid,
+    cCY + Math.sin(-openAngle) * capMid,
+    capR, 255, 255, 255, 255);
+  drawCircle(buf, W, H,
+    cCX + Math.cos(openAngle) * capMid,
+    cCY + Math.sin(openAngle) * capMid,
+    capR, 255, 255, 255, 255);
+
+  // ── Step4: Cの開口内にアクセントドット (#3D9A6A) ──
+  // 通知・アクティブを表す小さな緑の光る点
+  const dotX = cCX + (innerR + outerR) / 2 * Math.cos(0) + W * 0.03;
+  const dotY = cCY;
+  const dotR = W * 0.065;
+  // ドット本体
+  drawCircle(buf, W, H, dotX, dotY, dotR, 0x3d, 0x9a, 0x6a, 255);
+  // ドット内ハイライト（白い輝き）
+  drawCircle(buf, W, H, dotX - dotR * 0.28, dotY - dotR * 0.28, dotR * 0.38, 255, 255, 255, 180);
+
+  // ── Step5: C 下部にアクセントライン2本（チャットを示す） ──
+  const lineBaseY = cCY + outerR + H * 0.055;
+  const lh = Math.max(2, Math.round(H * 0.022));
+  const lr = lh / 2;
+  const lw1 = W * 0.34, lw2 = W * 0.22;
+  // 1本目（長い）
+  drawRoundRect(buf, W, H, cx - lw1 / 2, lineBaseY,        lw1, lh, lr, 0x3d, 0x9a, 0x6a, 190);
+  // 2本目（短い）
+  drawRoundRect(buf, W, H, cx - lw2 / 2, lineBaseY + lh * 1.8, lw2, lh, lr, 0x3d, 0x9a, 0x6a, 130);
 
   return encodePNG(buf, W, H);
 }
 
+// ──── ピクセル描画ユーティリティ ────
+
 function setPixel(buf, W, x, y, r, g, b, a) {
   if (x < 0 || y < 0 || x >= W) return;
   const i = (y * W + x) * 4;
-  if (a === 255) {
+  if (buf[i + 3] === 0 || a === 255) {
     buf[i] = r; buf[i+1] = g; buf[i+2] = b; buf[i+3] = 255;
   } else {
-    // アルファブレンド
     const sa = a / 255;
     buf[i]   = Math.round(buf[i]   * (1 - sa) + r * sa);
     buf[i+1] = Math.round(buf[i+1] * (1 - sa) + g * sa);
@@ -103,21 +118,6 @@ function drawRoundRect(buf, W, H, x, y, w, h, r, pr, pg, pb, pa) {
     for (let px = Math.floor(x); px <= Math.ceil(x + w); px++) {
       if (py < 0 || py >= H) continue;
       if (insideRoundRect(px, py, x, y, w, h, r)) {
-        setPixel(buf, W, px, py, pr, pg, pb, pa);
-      }
-    }
-  }
-}
-
-function drawTriangle(buf, W, H, x1, y1, x2, y2, x3, y3, pr, pg, pb, pa) {
-  const minX = Math.floor(Math.min(x1, x2, x3));
-  const maxX = Math.ceil(Math.max(x1, x2, x3));
-  const minY = Math.floor(Math.min(y1, y2, y3));
-  const maxY = Math.ceil(Math.max(y1, y2, y3));
-  for (let py = minY; py <= maxY; py++) {
-    for (let px = minX; px <= maxX; px++) {
-      if (py < 0 || py >= H) continue;
-      if (insideTriangle(px, py, x1, y1, x2, y2, x3, y3)) {
         setPixel(buf, W, px, py, pr, pg, pb, pa);
       }
     }
@@ -145,12 +145,11 @@ function encodePNG(buf, W, H) {
     buf.copy(raw, y * (W * 4 + 1) + 1, y * W * 4, (y + 1) * W * 4);
   }
   const compressed = zlib.deflateSync(raw);
-  const sig  = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  const sig  = Buffer.from([0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A]);
   const ihdr = chunk('IHDR', (() => {
     const b = Buffer.alloc(13);
-    b.writeUInt32BE(W, 0); b.writeUInt32BE(H, 4);
-    b[8] = 8; b[9] = 6; b[10] = 0; b[11] = 0; b[12] = 0;
-    return b;
+    b.writeUInt32BE(W,0); b.writeUInt32BE(H,4);
+    b[8]=8; b[9]=6; b[10]=0; b[11]=0; b[12]=0; return b;
   })());
   const idat = chunk('IDAT', compressed);
   const iend = chunk('IEND', Buffer.alloc(0));
@@ -179,33 +178,25 @@ function insideRoundRect(px, py, x, y, w, h, r) {
   if (px > x + r && px < x + w - r) return true;
   if (py > y + r && py < y + h - r) return true;
   const corners = [[x+r,y+r],[x+w-r,y+r],[x+r,y+h-r],[x+w-r,y+h-r]];
-  return corners.some(([cx,cy]) => (px-cx)**2 + (py-cy)**2 <= r*r);
+  return corners.some(([cx,cy]) => (px-cx)**2+(py-cy)**2 <= r*r);
 }
-
-function insideTriangle(px, py, x1, y1, x2, y2, x3, y3) {
-  const d1 = sign(px,py,x1,y1,x2,y2), d2 = sign(px,py,x2,y2,x3,y3), d3 = sign(px,py,x3,y3,x1,y1);
-  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0, hasPos = d1 > 0 || d2 > 0 || d3 > 0;
-  return !(hasNeg && hasPos);
-}
-function sign(px,py,x1,y1,x2,y2) { return (px-x2)*(y1-y2) - (x1-x2)*(py-y2); }
 
 function generate() {
-  const pub = path.join(__dirname, '..', 'public');
-  const p192 = path.join(pub, 'icon-192.png');
-  const p512 = path.join(pub, 'icon-512.png');
+  const pub   = path.join(__dirname, '..', 'public');
+  const p192  = path.join(pub, 'icon-192.png');
+  const p512  = path.join(pub, 'icon-512.png');
   const vFile = path.join(pub, '.icon-version');
 
-  // バージョンが変わったら再生成
   const currentVer = fs.existsSync(vFile) ? fs.readFileSync(vFile, 'utf8').trim() : '0';
   const needsRegen = currentVer !== String(ICON_VERSION);
 
   if (needsRegen || !fs.existsSync(p192)) {
     fs.writeFileSync(p192, makePNG(192));
-    console.log('icon-192.png 生成完了');
+    console.log('icon-192.png 生成完了 (v' + ICON_VERSION + ')');
   }
   if (needsRegen || !fs.existsSync(p512)) {
     fs.writeFileSync(p512, makePNG(512));
-    console.log('icon-512.png 生成完了');
+    console.log('icon-512.png 生成完了 (v' + ICON_VERSION + ')');
   }
   if (needsRegen) {
     fs.writeFileSync(vFile, String(ICON_VERSION));
