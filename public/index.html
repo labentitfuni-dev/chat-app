@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v21-bug-fixes">
+  <meta name="app-version" content="v22-keyboard-fix">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -205,7 +205,7 @@
 
     /* ===== 入力エリア ===== */
     #input-area { display: none; padding: 8px 10px; background: #eff0f1; border-top: 1px solid rgba(0,0,0,0.07); gap: 8px; align-items: center; }
-    #msg-input { flex: 1; padding: 9px 14px; border: 1.5px solid #e0e0e0; border-radius: 22px; font-size: 15px; outline: none; resize: none; background: white; transition: border-color 0.18s; -webkit-text-size-adjust: 100%; }
+    #msg-input { flex: 1; padding: 9px 14px; border: 1.5px solid #e0e0e0; border-radius: 22px; font-size: 16px; outline: none; resize: none; background: white; transition: border-color 0.18s; -webkit-text-size-adjust: 100%; touch-action: manipulation; -webkit-user-select: auto; user-select: auto; }
     #msg-input:focus { border-color: var(--green); }
     #send-btn { width: 38px; height: 38px; background: var(--btn-bg); color: white; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity 0.15s, transform 0.1s; box-shadow: 0 3px 12px rgba(61,154,106,0.42); }
     #send-btn:active { opacity: 0.85; transform: scale(0.93); }
@@ -273,7 +273,7 @@
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.58); justify-content: center; align-items: center; z-index: 100; }
     .modal-box { background: white; border-radius: 22px; padding: 28px; width: 320px; box-shadow: 0 24px 72px rgba(0,0,0,0.24); }
     .modal-box h3 { font-size: 17px; font-weight: 700; margin-bottom: 16px; text-align: center; letter-spacing: -0.2px; }
-    .modal-box input { width: 100%; padding: 12px 16px; border: 1.5px solid #eee; border-radius: 12px; font-size: 20px; outline: none; margin-bottom: 12px; text-align: center; letter-spacing: 4px; font-weight: 700; background: #fafafa; }
+    .modal-box input { width: 100%; padding: 12px 16px; border: 1.5px solid #eee; border-radius: 12px; font-size: 20px; outline: none; margin-bottom: 12px; text-align: center; letter-spacing: 4px; font-weight: 700; background: #fafafa; touch-action: manipulation; -webkit-user-select: auto; user-select: auto; }
     .modal-box input:focus { border-color: var(--green); background: white; }
     .modal-btns { display: flex; gap: 8px; }
     .modal-btns button { flex: 1; padding: 12px; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; }
@@ -2146,20 +2146,10 @@
     });
   }
 
-  // ログイン入力欄: タップで確実にフォーカス（readonlyハックは副作用があるため廃止）
-  ['username-input', 'password-input', 'displayname-input'].forEach(id => {
-    const el = $(id);
-    if (!el) return;
-    el.addEventListener('touchend', function(e) {
-      e.preventDefault(); // iOSでの300ms遅延をキャンセル
-      this.focus();
-    });
-  });
+  // ログイン入力欄: JS介入なし。CSS の touch-action:manipulation で300ms遅延を解消済み。
+  // touchend/touchstart でe.preventDefault()すると iOS がキーボードを出さなくなるため廃止。
 
-  // 入力欄タップで確実にフォーカス
-  $('msg-input').addEventListener('touchstart', function() {
-    this.focus();
-  }, { passive: true });
+  // チャット入力欄もネイティブ挙動に任せる（msg-inputはCSS touch-action:manipulation済み）
 
 
   // ========== インストール判定ユーティリティ ==========
