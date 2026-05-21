@@ -1,5 +1,5 @@
-const SW_VERSION = 12;
-const CACHE_NAME = 'cha-shell-v12';
+const SW_VERSION = 13;
+const CACHE_NAME = 'cha-shell-v13';
 const HTML_URLS  = ['/', '/call'];
 
 self.addEventListener('install', (event) => {
