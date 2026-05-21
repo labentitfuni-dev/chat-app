@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v25-missed-call-ios">
+  <meta name="app-version" content="v26-keyboard-fix2">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -2108,6 +2108,12 @@
   function showLoginScreen() {
     $('loading-screen').style.display = 'none';
     $('login-screen').style.display = 'flex';
+    // iOS PWA: display:none から表示されたinputをiOSに再認識させる（強制リフロー）
+    // これがないと最初のタップでキーボードが出ない場合がある
+    setTimeout(() => {
+      const u = $('username-input');
+      if (u) { u.style.transform = 'translateZ(0)'; requestAnimationFrame(() => { u.style.transform = ''; }); }
+    }, 100);
   }
 
   async function autoLogin() {
@@ -2169,10 +2175,17 @@
     });
   }
 
-  // ログイン入力欄: JS介入なし。CSS の touch-action:manipulation で300ms遅延を解消済み。
-  // touchend/touchstart でe.preventDefault()すると iOS がキーボードを出さなくなるため廃止。
+  // ログイン入力欄: touchend で明示的に focus()（e.preventDefault は呼ばない）
+  // iOS PWA は display:none から表示された要素をネイティブタップだけでフォーカスしない場合がある
+  // passive:true + preventDefault不使用 = iOS がキーボードを出す唯一確実な方法
+  ['username-input', 'password-input', 'displayname-input'].forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('touchend', function() { this.focus(); }, { passive: true });
+  });
 
-  // チャット入力欄もネイティブ挙動に任せる（msg-inputはCSS touch-action:manipulation済み）
+  // チャット入力欄も同様
+  $('msg-input').addEventListener('touchend', function() { this.focus(); }, { passive: true });
 
 
   // ========== インストール判定ユーティリティ ==========
