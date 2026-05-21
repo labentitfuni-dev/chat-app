@@ -2,7 +2,7 @@ const fs   = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const ICON_VERSION = 5; // bump to force regeneration
+const ICON_VERSION = 6; // bump to force regeneration
 
 function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
 
@@ -11,30 +11,30 @@ function makePNG(size) {
   const cx = W / 2, cy = H / 2;
   const buf = Buffer.alloc(W * H * 4);
 
-  // ── 背景: アプリと同じ深いグリーン (#0d1f14 → #061209) ──
+  // ── 背景: 明るめの親しみやすいグリーン (#3a7d54 → #1e4d32) ──
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const t = (x + y) / (W + H - 2);
       const i = (y * W + x) * 4;
-      buf[i]   = lerp(0x0d, 0x06, t);
-      buf[i+1] = lerp(0x1f, 0x12, t);
-      buf[i+2] = lerp(0x14, 0x09, t);
+      buf[i]   = lerp(0x2a, 0x16, t);
+      buf[i+1] = lerp(0x6a, 0x40, t);
+      buf[i+2] = lerp(0x44, 0x28, t);
       buf[i+3] = 255;
     }
   }
 
-  // ── 中央グロー (温かみのある緑の光) ──
+  // ── 中央グロー (明るく温かい光) ──
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const dx = x - cx, dy = y - cy;
       const dist = Math.sqrt(dx*dx + dy*dy);
-      const glowR = W * 0.58;
+      const glowR = W * 0.60;
       if (dist < glowR) {
-        const a = Math.pow(1 - dist/glowR, 1.8) * 0.32;
+        const a = Math.pow(1 - dist/glowR, 1.6) * 0.30;
         const i = (y*W+x)*4;
-        buf[i]   = Math.min(255, buf[i]   + Math.round(0x3d * a));
-        buf[i+1] = Math.min(255, buf[i+1] + Math.round(0x9a * a));
-        buf[i+2] = Math.min(255, buf[i+2] + Math.round(0x6a * a));
+        buf[i]   = Math.min(255, buf[i]   + Math.round(0x80 * a));
+        buf[i+1] = Math.min(255, buf[i+1] + Math.round(0xff * a));
+        buf[i+2] = Math.min(255, buf[i+2] + Math.round(0xa0 * a));
       }
     }
   }
