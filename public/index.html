@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v23-stability">
+  <meta name="app-version" content="v24-reliability">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -1588,11 +1588,15 @@
   $('send-btn').onclick = sendMessage;
   $('msg-input').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
 
+  let _sendLock = false;
   async function sendMessage() {
+    if (_sendLock) return; // ダブルタップ防止
     const text = $('msg-input').value.trim();
     if (!text && !pendingFile) return;
     if (!currentContact) return;
     if (!socket?.connected) { showToast('⚠️ 接続中です。しばらく待ってください'); return; }
+    _sendLock = true;
+    setTimeout(() => { _sendLock = false; }, 500); // 500ms後に解除
 
     let fileData = null;
     if (pendingFile) {
@@ -1627,8 +1631,9 @@
       $('file-preview-bar').style.display = 'none';
     }
 
-    socket.emit('sendMessage', { toUserId: currentContact.id, text, file: fileData });
+    // 入力をクリアしてから送信（ダブルタップ時の二重送信を防ぐ）
     $('msg-input').value = '';
+    socket.emit('sendMessage', { toUserId: currentContact.id, text, file: fileData });
   }
 
   function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
@@ -2028,6 +2033,22 @@
     }
   }
 
+  // Push購読の定期ヘルスチェック（30分おき）
+  // ブラウザがサブスクリプションを失効させてもサーバー側に再登録する
+  setInterval(async () => {
+    if (!me || !token) return;
+    if (Notification?.permission !== 'granted') return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        // サブスクリプションが失われていたら再登録
+        await subscribePush(reg);
+      }
+    } catch {}
+  }, 30 * 60 * 1000);
+
   async function requestNotifPermission() {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const standalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
@@ -2283,6 +2304,7 @@
   // ソケット再接続後に状態を更新
   function connectSocket() {
     if (socket) { socket.disconnect(); socket = null; }
+    _pendingHistoryQueue = []; // 新しいソケット作成時にキューをリセット
     socket = io({ auth: { token }, transports: ['websocket'] });
     socket.on('connect_error', (err) => {
       if (err.message === 'トークンが無効です' || err.message === '認証が必要です') {
