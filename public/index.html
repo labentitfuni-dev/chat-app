@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v29-keyboard-fix5">
+  <meta name="app-version" content="v30-keyboard-fix6">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -2110,9 +2110,38 @@
   // ========== 自動ログイン ==========
   function showLoginScreen() {
     $('loading-screen').style.display = 'none';
-    // login-screenは最初からDOMに描画済み（display:none にしていない）なので
-    // ここでの表示切替は不要だが、startApp()で hidden にした後の再表示用に残す
     $('login-screen').style.display = 'flex';
+
+    // ── iOS PWA キーボード確実起動 ──────────────────────────────────────
+    // iOS WKWebView (PWA standalone) では input への直接タップでもキーボードが
+    // 出ないことがある。唯一確実な方法は <button> の click ハンドラ内で focus()。
+    // ログインカードを覆う透明ボタンを1回だけ設置し、最初のタップを
+    // "button click → focus()" に変換することでキーボードを強制表示する。
+    if (isIos() && isInStandaloneMode()) {
+      const card = document.querySelector('.login-card');
+      if (card && !card.querySelector('#_ios_kb_btn')) {
+        card.style.position = 'relative';
+        const btn = document.createElement('button');
+        btn.id = '_ios_kb_btn';
+        btn.setAttribute('aria-hidden', 'true');
+        btn.style.cssText = [
+          'position:absolute', 'inset:0', 'z-index:2',
+          'background:transparent', 'border:none', 'cursor:text',
+          '-webkit-tap-highlight-color:transparent', 'touch-action:manipulation'
+        ].join(';');
+        card.appendChild(btn);
+
+        btn.addEventListener('click', function(e) {
+          this.remove();
+          card.style.position = '';
+          // タップ位置でパスワード欄か判定
+          const pwRect = $('password-input').getBoundingClientRect();
+          const target = (e.clientY >= pwRect.top) ? $('password-input') : $('username-input');
+          target.focus();
+        }, { once: true });
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────
   }
 
   async function autoLogin() {
