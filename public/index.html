@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v15-ringtone-audio-fullscreen">
+  <meta name="app-version" content="v20-input-bug-fix">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -2143,23 +2143,12 @@
     });
   }
 
-  // ログイン入力欄: iOS PWA でキーボードを確実に出す
+  // ログイン入力欄: タップで確実にフォーカス（readonlyハックは副作用があるため廃止）
   ['username-input', 'password-input', 'displayname-input'].forEach(id => {
     const el = $(id);
     if (!el) return;
-    // readonly解除トリック: iOS PWAではreadonly→非readonlyに切替るとキーボードが出る
-    el.setAttribute('readonly', true);
-    el.addEventListener('focus', function() { this.removeAttribute('readonly'); });
-    el.addEventListener('touchstart', function(e) {
-      this.removeAttribute('readonly');
-      this.focus();
-    }, { passive: true });
     el.addEventListener('touchend', function(e) {
-      this.removeAttribute('readonly');
-      this.focus();
-    });
-    el.addEventListener('click', function() {
-      this.removeAttribute('readonly');
+      e.preventDefault(); // iOSでの300ms遅延をキャンセル
       this.focus();
     });
   });
