@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v30-keyboard-fix6">
+  <meta name="app-version" content="v31-keyboard-fix7">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -2112,29 +2112,29 @@
     $('loading-screen').style.display = 'none';
     $('login-screen').style.display = 'flex';
 
-    // ── iOS PWA キーボード確実起動 ──────────────────────────────────────
-    // iOS WKWebView (PWA standalone) では input への直接タップでもキーボードが
-    // 出ないことがある。唯一確実な方法は <button> の click ハンドラ内で focus()。
-    // ログインカードを覆う透明ボタンを1回だけ設置し、最初のタップを
-    // "button click → focus()" に変換することでキーボードを強制表示する。
-    if (isIos() && isInStandaloneMode()) {
-      const card = document.querySelector('.login-card');
-      if (card && !card.querySelector('#_ios_kb_btn')) {
-        card.style.position = 'relative';
+    // ── iOS キーボード確実起動（standalone判定に依存しない） ─────────────
+    // iOS Safari / PWA 問わず: input直接タップでキーボードが出ない場合がある。
+    // 対策: login-form を覆う透明 <button type="button"> を1回限り設置。
+    // button click → focus() は iOS が必ずキーボードを表示するパス。
+    // isInStandaloneMode() の判定ミスを避けるため iOS全体に適用。
+    if (isIos()) {
+      const form = $('login-form');
+      if (form && !form.querySelector('#_ios_kb_btn')) {
+        form.style.position = 'relative';
         const btn = document.createElement('button');
         btn.id = '_ios_kb_btn';
+        btn.type = 'button';
         btn.setAttribute('aria-hidden', 'true');
         btn.style.cssText = [
           'position:absolute', 'inset:0', 'z-index:2',
           'background:transparent', 'border:none', 'cursor:text',
           '-webkit-tap-highlight-color:transparent', 'touch-action:manipulation'
         ].join(';');
-        card.appendChild(btn);
+        form.appendChild(btn);
 
         btn.addEventListener('click', function(e) {
           this.remove();
-          card.style.position = '';
-          // タップ位置でパスワード欄か判定
+          form.style.position = '';
           const pwRect = $('password-input').getBoundingClientRect();
           const target = (e.clientY >= pwRect.top) ? $('password-input') : $('username-input');
           target.focus();
@@ -2192,14 +2192,8 @@
         }
       }
 
-      // ログイン画面：キーボードが出たら入力欄が見えるようスクロール
-      const loginVisible = loginScreen && getComputedStyle(loginScreen).display !== 'none';
-      if (loginVisible && keyboardHeight > 100) {
-        const active = document.activeElement;
-        if (active && active.tagName === 'INPUT') {
-          setTimeout(() => active.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-        }
-      }
+      // ログイン画面の scrollIntoView は削除
+      // キーボード出現中にスクロールすると iOS がキーボードを即座に消すため
     });
   }
 
