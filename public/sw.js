@@ -120,7 +120,9 @@ self.addEventListener('notificationclick', (event) => {
 
   let targetUrl = '/';
   if (data.type === 'call' && data.callUrl) {
-    targetUrl = data.callUrl;
+    // ★ 相対パス /call? のみ許可（外部URLの混入防止: 二重防御）
+    targetUrl = (typeof data.callUrl === 'string' && /^\/call\?/.test(data.callUrl))
+      ? data.callUrl : '/';
   } else if (data.fromId) {
     targetUrl = '/?chat=' + data.fromId;
   }

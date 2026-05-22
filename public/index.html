@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v42">
+  <meta name="app-version" content="v43">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
@@ -69,6 +69,8 @@
     .tab-header {
       background: #fff; color: #111;
       padding: 14px 16px 12px;
+      /* ★ ノッチ/Dynamic Island対策: ステータスバー分だけ上に余白を追加 */
+      padding-top: calc(14px + env(safe-area-inset-top, 0px));
       display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
       border-bottom: 1px solid rgba(0,0,0,0.07);
     }
@@ -79,7 +81,9 @@
     #install-btn { background: var(--green); border: none; color: white; cursor: pointer; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 12px; display: none; }
 
     /* ===== ボトムタブ ===== */
-    #tab-bar { display: flex; background: white; border-top: 1px solid rgba(0,0,0,0.08); flex-shrink: 0; }
+    #tab-bar { display: flex; background: white; border-top: 1px solid rgba(0,0,0,0.08); flex-shrink: 0;
+      /* ★ ホームインジケーター対策: 下に余白を追加 */
+      padding-bottom: env(safe-area-inset-bottom, 0px); }
     .tab-btn { flex: 1; padding: 10px 0 8px; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #bbb; font-size: 10px; font-weight: 600; letter-spacing: 0.2px; transition: color 0.15s; }
     .tab-btn.active { color: var(--green); }
     .tab-btn svg { width: 24px; height: 24px; }
@@ -90,7 +94,9 @@
     #settings-panel { display: none; position: fixed; inset: 0; z-index: 150; }
     #settings-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(3px); }
     #settings-box { position: absolute; top: 0; right: 0; width: 290px; height: 100%; background: #f2f3f5; display: flex; flex-direction: column; box-shadow: -8px 0 32px rgba(0,0,0,0.14); }
-    #settings-header { background: var(--green); color: white; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+    #settings-header { background: var(--green); color: white; padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+      /* ★ 設定パネルもfixed top:0からなのでノッチ対策 */
+      padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
     #settings-header h3 { flex: 1; font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
     #settings-close { background: none; border: none; color: rgba(255,255,255,0.8); font-size: 22px; cursor: pointer; }
     .settings-section { padding: 20px 16px 8px; font-size: 10.5px; color: #aaa; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
@@ -148,7 +154,9 @@
 
     /* ===== チャットパネル ===== */
     #chat-panel { flex: 1; display: flex; flex-direction: column; }
-    #chat-header { background: var(--hdr); color: white; padding: 12px 16px; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.22); }
+    #chat-header { background: var(--hdr); color: white; padding: 12px 16px; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.22);
+      /* ★ チャットパネルはfixed top:0なのでノッチ対策が必要 */
+      padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
     #chat-header h3 { flex: 1; font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
     #call-btn, #video-call-btn, #delete-chat-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
     #call-btn:active, #video-call-btn:active, #delete-chat-btn:active { background: rgba(255,255,255,0.18); }
@@ -211,7 +219,9 @@
     #avatar-modal-name { color: white; font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
 
     /* ===== 入力エリア ===== */
-    #input-area { display: none; padding: 8px 10px; background: #eff0f1; border-top: 1px solid rgba(0,0,0,0.07); gap: 8px; align-items: center; }
+    #input-area { display: none; padding: 8px 10px; background: #eff0f1; border-top: 1px solid rgba(0,0,0,0.07); gap: 8px; align-items: center;
+      /* ★ ホームインジケーター対策: 下に余白を追加 */
+      padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
     #msg-input { flex: 1; padding: 9px 14px; border: 1.5px solid #e0e0e0; border-radius: 22px; font-size: 16px; outline: none; resize: none; background: white; transition: border-color 0.18s; -webkit-text-size-adjust: 100%; touch-action: manipulation; -webkit-user-select: auto; user-select: auto; }
     #msg-input:focus { border-color: var(--green); }
     #send-btn { width: 38px; height: 38px; background: var(--btn-bg); color: white; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity 0.15s, transform 0.1s; box-shadow: 0 3px 12px rgba(61,154,106,0.42); }
@@ -1958,15 +1968,15 @@
 
   function openCallPage(url) {
     if (!url || typeof url !== 'string') return;
-    // ★ javascript: スキームインジェクション対策: /call? または https:// のみ許可
-    // 悪意あるユーザーが signal.jitsiUrl に javascript:... を設定してもXSSを防止
-    const trimmed = url.trim().toLowerCase();
-    if (!trimmed.startsWith('/call?') && !trimmed.startsWith('https://')) return;
+    // ★ ネイティブWebRTCのみ対応: /call? 相対パスのみ許可
+    // https:// URL（旧Jitsi fallback）は不要になったため排除（外部URL注入・フィッシング防止）
+    if (!url.trim().startsWith('/call?')) return;
     if (/iPhone|iPad|iPod/.test(navigator.userAgent)) location.href = url;
     else window.open(url, '_blank');
   }
 
   function startCall(contact, hasVideo = false) {
+    if (!contact) { showToast('⚠️ 通話相手が選択されていません'); return; }
     if (!socket?.connected) { showToast('⚠️ 接続中です。しばらく待ってください'); return; }
     const roomId = generateRoomId();
     const videoParam = hasVideo ? '&video=true' : '';
@@ -2588,7 +2598,8 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') {
       // バックグラウンド: 着信中でなければAudioContextをsuspend（バッテリー節約）
-      if (_sharedAudioCtx?.state === 'running' && !_ringtoneAudio?.paused === false) {
+      // ★ 修正: !x?.y === false は演算子優先順位バグ。 (!_ringtoneAudio || _ringtoneAudio.paused) で正しく評価
+      if (_sharedAudioCtx?.state === 'running' && (!_ringtoneAudio || _ringtoneAudio.paused)) {
         _sharedAudioCtx.suspend().catch(() => {});
       }
       return;
