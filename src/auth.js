@@ -228,11 +228,15 @@ router.post('/google', async (req, res) => {
     } else {
       // 新規ユーザー作成
       let baseUsername = email ? email.split('@')[0] : googleName.replace(/\s+/g, '').toLowerCase();
+      // ★ ベースユーザー名を英数字のみに正規化（特殊文字・空ユーザー名防止）
+      baseUsername = baseUsername.replace(/[^a-zA-Z0-9_.@-]/g, '').slice(0, 28) || 'user';
       let username = baseUsername;
       let suffix = 1;
-      while (await User.findOne({ username })) {
+      // ★ 最大50回試行（無限ループ防止）
+      while (await User.findOne({ username }) && suffix <= 50) {
         username = baseUsername + suffix++;
       }
+      if (suffix > 50) throw new Error('ユーザー名の生成に失敗しました（試行上限超過）');
       user = await User.create({
         username,
         displayName: googleName,

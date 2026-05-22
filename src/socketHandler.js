@@ -219,6 +219,7 @@ function setupSocket(io) {
     // ========== チャット画面の通話シグナリング ==========
     socket.on('callUser', ({ toUserId, signal }) => {
       if (typeof toUserId !== 'string' || !toUserId.trim()) return; // 型チェック
+      if (!/^[0-9a-fA-F]{24}$/.test(toUserId)) return; // ★ ObjectId形式チェック（他イベントと統一）
       if (!callRateLimit(socket.id)) return; // ★ call spam防止（1分3件制限）
       const toSocketId = getSocketId(toUserId);
       if (toSocketId) {
