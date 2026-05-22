@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v47">
+  <meta name="app-version" content="v48">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
@@ -1423,10 +1423,39 @@
   let _sharedAudioCtx = null;
   let _ringtoneAudio = null;   // HTML Audio要素（着信音用・より信頼性が高い）
   let _ringtoneReady = false;
+  let _keepAliveAudio = null;  // ★ iOS バックグラウンド対策: 無音ループでオーディオセッションを維持
 
   function _initAudioCtx() {
     if (_sharedAudioCtx && _sharedAudioCtx.state !== 'closed') return;
     try { _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+  }
+
+  // 0.2秒の無音WAVを生成（キープアライブ用）
+  function _buildSilenceWav() {
+    const sr = 22050, n = Math.floor(sr * 0.2); // 0.2秒
+    const buf = new ArrayBuffer(44 + n * 2);
+    const dv = new DataView(buf);
+    const ws = (o, s) => [...s].forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
+    ws(0,'RIFF'); dv.setUint32(4, 36 + n*2, true); ws(8,'WAVE'); ws(12,'fmt ');
+    dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,1,true);
+    dv.setUint32(24,sr,true); dv.setUint32(28,sr*2,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true);
+    ws(36,'data'); dv.setUint32(40,n*2,true);
+    // data部: 全0 = 無音（ArrayBufferはデフォルトで0埋め）
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    return 'data:audio/wav;base64,' + btoa(bin);
+  }
+
+  // ★ iOS バックグラウンド着信音対策: 無音をループ再生してオーディオセッションを維持
+  // iOS は一度オーディオセッションを取得してから継続再生中なら
+  // バックグラウンド移行後もしばらく音が出る可能性がある（完全保証はできない）
+  function _startKeepAlive() {
+    if (_keepAliveAudio) return;
+    _keepAliveAudio = new Audio(_buildSilenceWav());
+    _keepAliveAudio.loop   = true;
+    _keepAliveAudio.volume = 0.001; // ほぼ無音（0だとiOSが再生をスキップする場合がある）
+    _keepAliveAudio.play().catch(() => {}); // ユーザー操作後に呼ぶので通常は成功
   }
 
   // WAVファイルをプログラムで生成してdata URLを返す
@@ -1479,6 +1508,10 @@
         }).catch(() => {}); // エラーは無視（着信時にリトライ）
         _ringtoneReady = true;
       }
+      // ★ iOS バックグラウンド対策: ユーザー操作後に無音ループを開始
+      // オーディオセッションを「使用中」状態に保つことで
+      // 着信時（バックグラウンド）でも audio.play() が通りやすくなる
+      _startKeepAlive();
       document.removeEventListener(ev, warmCtx);
     }, { once: true, passive: true });
   });
@@ -1939,6 +1972,9 @@
     let vibTimeout = null;
     let audioStarted = false;
 
+    // ── 0. キープアライブを一時停止して着信音に切り替え ──
+    if (_keepAliveAudio && !_keepAliveAudio.paused) _keepAliveAudio.pause();
+
     // ── 1. HTML Audio要素（最優先・モバイルで確実）──
     if (_ringtoneAudio) {
       _ringtoneAudio.currentTime = 0;
@@ -2015,6 +2051,8 @@
             navigator.mediaSession.setActionHandler('stop',  null);
           } catch {}
         }
+        // ★ キープアライブを再開（次の着信に備えてセッションを維持）
+        if (_keepAliveAudio) _keepAliveAudio.play().catch(() => {});
       }
     };
   }
@@ -2679,6 +2717,19 @@
     // バックグラウンドから復帰: AudioContext を再開（着信音が途切れないように）
     if (_sharedAudioCtx?.state === 'suspended') _sharedAudioCtx.resume().catch(() => {});
     if (!me) return;
+
+    // ★ iOS バックグラウンド着信音フォールバック:
+    // 通知タップでアプリが前面に来た時点で着信モーダルが出ていれば着信音を即開始
+    // バックグラウンドで音が出なかった場合のリカバリー
+    if ($('call-modal').style.display === 'flex' && !ringtone) {
+      ringtone = createRingtone();
+    }
+
+    // ★ キープアライブが途切れていたら再開（バックグラウンドでiOSに止められた場合）
+    if (_keepAliveAudio && _keepAliveAudio.paused && !ringtone) {
+      _keepAliveAudio.play().catch(() => {});
+    }
+
     if (socket && !socket.connected) socket.connect();
     // 友達一覧はソケット reconnect 時に更新されるので不要。現チャットだけ更新
     if (currentContact && socket?.connected) {
