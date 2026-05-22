@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v43">
+  <meta name="app-version" content="v45">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
@@ -153,7 +153,8 @@
     .contact-status.online { color: var(--green-deep); font-weight: 600; }
 
     /* ===== チャットパネル ===== */
-    #chat-panel { flex: 1; display: flex; flex-direction: column; }
+    /* ★ overflow:hidden + min-height:0 がないと flex 子要素が無限に伸びてスクロール不可になる */
+    #chat-panel { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
     #chat-header { background: var(--hdr); color: white; padding: 12px 16px; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.22);
       /* ★ チャットパネルはfixed top:0なのでノッチ対策が必要 */
       padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
@@ -164,7 +165,8 @@
     #no-chat-add { background: var(--btn-bg); color: white; border: none; border-radius: 20px; padding: 10px 22px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: var(--btn-shadow); }
 
     /* ===== メッセージエリア ===== */
-    #messages { flex: 1; overflow-y: auto; padding: 12px 14px; background: #e8e0d8; display: none; flex-direction: column; gap: 3px; }
+    /* ★ min-height:0 必須: flex子要素はデフォルト min-height:auto のため overflow-y が効かない */
+    #messages { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px; background: #e8e0d8; display: none; flex-direction: column; gap: 3px; overscroll-behavior: contain; }
 
     /* ===== スワイプ削除 ===== */
     .swipe-wrap { position: relative; }
@@ -384,7 +386,8 @@
       #sidebar { width: 100%; }
       #chat-panel { display: none; }
       #sidebar.hidden { display: none; }
-      #chat-panel.show { display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 10; background: white; flex-direction: column; }
+      #chat-panel.show { display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 10; background: white; flex-direction: column; overflow: hidden; }
+      /* ★ iOS Safari: -webkit-overflow-scrolling:touch で慣性スクロール有効化 */
       #messages { -webkit-overflow-scrolling: touch; }
       #back-btn { display: block; }
       .bubble { max-width: 80%; }
