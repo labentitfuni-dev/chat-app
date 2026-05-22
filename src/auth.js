@@ -197,6 +197,12 @@ router.post('/google', async (req, res) => {
 
     if (!payload.sub) return res.status(401).json({ error: 'Googleトークンが無効です' });
 
+    // ★ audience検証: 自アプリ向けのトークンかを確認（他アプリのトークンの流用を防止）
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (clientId && payload.aud !== clientId) {
+      return res.status(401).json({ error: 'Googleトークンが無効です' });
+    }
+
     const googleId = payload.sub;
     const email = payload.email || '';
     const googleName = payload.name || email.split('@')[0] || 'User';

@@ -37,6 +37,9 @@ const BLOCKED_MIME = new Set([
   'text/x-shellscript', 'application/x-php', 'text/x-php',
   'application/x-perl', 'application/x-ruby',
   'application/x-python', 'text/x-python',
+  // ★ JavaScriptのMIMEタイプ（拡張子ブロックと組み合わせて二重防御）
+  'text/javascript', 'application/javascript', 'text/x-javascript',
+  'application/ecmascript', 'text/ecmascript',
 ]);
 
 const upload = multer({

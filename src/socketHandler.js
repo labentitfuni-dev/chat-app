@@ -142,6 +142,8 @@ function setupSocket(io) {
       // 入力バリデーション
       if (typeof toUserId !== 'string' || !toUserId.trim()) return;
       if ((!text && !file) || !toUserId) return;
+      // ★ ObjectId形式チェック（無効IDでのMessage.create + findById CastError防止）
+      if (!/^[0-9a-fA-F]{24}$/.test(toUserId)) return;
       // メッセージ長制限（10,000文字超はブロック）
       if (text && (typeof text !== 'string' || text.length > 10000)) {
         return socket.emit('sendError', { error: 'メッセージが長すぎます（最大10,000文字）' });
@@ -180,9 +182,13 @@ function setupSocket(io) {
         // オンライン・バックグラウンド問わず常にpushを送る（SWがフォアグラウンド時は表示を抑制）
         const recipient = await User.findById(toUserId).lean();
         const hideContent = recipient?.hideNotifContent;
+        // ★ push body は200文字で切り捨て（Web Push の ~4KB ペイロード上限超えを防止）
+        const rawBody = hideContent ? '新しいメッセージがあります' : (out.file ? '📎 ファイルが届きました' : out.text);
+        const pushBody = typeof rawBody === 'string' && rawBody.length > 200
+          ? rawBody.slice(0, 200) + '…' : (rawBody || '');
         sendPushNotification(toUserId, {
           title: socket.username,
-          body: hideContent ? '新しいメッセージがあります' : (out.file ? '📎 ファイルが届きました' : out.text),
+          body: pushBody,
           icon: '/icon-192.png',
           badge: '/icon-192.png',
           data: { fromId: socket.userId }
@@ -195,6 +201,7 @@ function setupSocket(io) {
 
     socket.on('markRead', async ({ fromUserId }) => {
       if (typeof fromUserId !== 'string' || !fromUserId.trim()) return; // 型チェック
+      if (!/^[0-9a-fA-F]{24}$/.test(fromUserId)) return; // ★ ObjectId形式チェック
       if (!markReadLimit(socket.id)) return; // スパム防止
       try {
         await Message.updateMany({ fromId: fromUserId, toId: socket.userId }, { read: true });

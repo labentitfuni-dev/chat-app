@@ -29,10 +29,13 @@ messageSchema.index({ fromId: 1, toId: 1, createdAt: 1 });
 messageSchema.index({ toId: 1, fromId: 1, createdAt: 1 });
 
 const pushSubSchema = new mongoose.Schema({
-  userId:       { type: String, required: true, index: true },
+  userId:       { type: String, required: true },
   endpoint:     { type: String, required: true },
   subscription: { type: Object, required: true },
 }, { timestamps: true });
+
+// ★ 複合インデックス: subscribe の upsert クエリ { userId, endpoint } を高速化
+pushSubSchema.index({ userId: 1, endpoint: 1 }, { unique: true });
 
 const User    = mongoose.model('User', userSchema);
 const Message = mongoose.model('Message', messageSchema);
