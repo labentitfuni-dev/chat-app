@@ -129,7 +129,7 @@ app.use('/api/upload', makeApiRateLimit(20, 60000), require('./upload')); // ★
 app.use('/api/push',   require('./push').router);
 app.use('/api/errors', errorRouter);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
-app.get('/api/version', (req, res) => res.json({ version: 'v46' }));
+app.get('/api/version', (req, res) => res.json({ version: 'v47' }));
 
 // ── TURN HMAC認証クレデンシャル生成（coturn use-auth-secret 方式） ──────
 // RFC 5766 時限クレデンシャル: username=有効期限タイムスタンプ, credential=HMAC-SHA1
