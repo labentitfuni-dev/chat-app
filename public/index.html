@@ -1454,7 +1454,7 @@
     if (_keepAliveAudio) return;
     _keepAliveAudio = new Audio(_buildSilenceWav());
     _keepAliveAudio.loop   = true;
-    _keepAliveAudio.volume = 0.001; // ほぼ無音（0だとiOSが再生をスキップする場合がある）
+    _keepAliveAudio.volume = 0.01; // ★ 0.001→0.01: iOSがオーディオセッションを確実に認識できる最低音量
     _keepAliveAudio.play().catch(() => {}); // ユーザー操作後に呼ぶので通常は成功
   }
 
@@ -2237,6 +2237,7 @@
 
   async function _acquireWakeLock() {
     if (!('wakeLock' in navigator)) return; // 非対応ブラウザはスキップ
+    if (_wakeLock) return; // ★ 既に取得済みなら多重取得しない（リーク防止）
     try {
       _wakeLock = await navigator.wakeLock.request('screen');
       // ページ非表示などでOSがロックを強制解放した場合の追跡
