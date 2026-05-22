@@ -235,9 +235,11 @@
     let _iceRestartCount       = 0;
     let _iceRestartInProgress  = false; // ★ 再入防止フラグ（concurrent restart race対策）
     let _iceCandidateQueue     = [];
+    let _sentCandidates        = [];    // ★ 送信済み候補を記録（ソケット再接続後に再送するため）
     let _localStreamReady      = false;
     let _localStreamWaiters    = [];
     let _iceCheckingTimer      = null; // ICE checkingが30秒超えたらrestart
+    let _relayFallbackTriggered = false; // ★ relay-only フォールバック済みフラグ
     let _keepAliveTimer     = null; // 接続後のKeep-alive監視
     let _lastPongTime       = 0;
     let _dataChannel        = null; // Keep-alive用DataChannel
@@ -618,6 +620,8 @@
         await flushIceCandidateQueue(); // ★ キュー内の候補を追加
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
+        // ★ アンサー側も TURN 候補が揃ってから返信（対称NAT対策）
+        await waitForIceGathering(pc, 2000);
         socket.emit('callAnswer', { roomId, answer });
       } catch (e) {
         console.error('[callOffer]', e);
@@ -704,9 +708,55 @@
           // 再接続後、call roomに再参加
           socket.emit('joinCallRoom', { roomId, displayName: me.displayName || me.username, avatar: me.avatar || '' });
           await new Promise(r => setTimeout(r, 1000)); // room ready を待つ
+          // ★ ソケット切断中に相手が受け取れなかったICE候補を再送（候補ロスト対策）
+          if (_sentCandidates.length > 0) {
+            _sentCandidates.forEach(c => socket.emit('callIceCandidate', { roomId, candidate: c }));
+          }
         }
-        const offer = await pc.createOffer({ iceRestart: true });
+
+        // ★ relay-onlyフォールバック: 4回以上失敗したらTURN強制（対称NAT完全突破）
+        if (_iceRestartCount >= 4 && !_relayFallbackTriggered && iceConfig.iceServers.some(s => String(s.urls).startsWith('turn'))) {
+          _relayFallbackTriggered = true;
+          reportError('ice-relay-fallback', `switching to relay-only at attempt ${_iceRestartCount}`);
+          $('status').textContent = 'TURN経由で再接続中...';
+          // 既存PCを閉じてrelay-onlyで再作成
+          if (pc) { try { pc.close(); } catch {} }
+          const relayConfig = { ...iceConfig, iceTransportPolicy: 'relay' };
+          pc = new RTCPeerConnection(relayConfig);
+          _iceCandidateQueue = [];
+          _sentCandidates = [];
+          localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+          // イベントハンドラを再設定（initPCの内容を最小限で再現）
+          pc.onicecandidate = ({ candidate }) => {
+            if (candidate) {
+              _sentCandidates.push(candidate);
+              socket.emit('callIceCandidate', { roomId, candidate });
+            }
+          };
+          pc.oniceconnectionstatechange = () => {
+            if (!pc) return;
+            const s = pc.iceConnectionState;
+            if (s === 'connected' || s === 'completed') { onCallConnected(); startKeepAlive(); startAudioWatchdog(); }
+            if (s === 'failed') {
+              reportError('ice-relay-failed', 'relay mode also failed');
+              $('status').textContent = '接続できませんでした';
+              setTimeout(() => endCall(false), 2000);
+            }
+          };
+          pc.ontrack = e => {
+            const stream = e.streams[0] || new MediaStream([e.track]);
+            const audio = $('remote-audio');
+            if (e.track.kind === 'video') { const rv = $('remote-video'); if (rv) { rv.srcObject = stream; rv.play().catch(()=>{}); } return; }
+            if (audio.srcObject && audio.srcObject.id === stream.id) return;
+            audio.srcObject = stream; audio.volume = 1.0; audio.muted = isSpeakerOn;
+            tryPlayAudio(audio);
+          };
+        }
+
+        const offer = await pc.createOffer({ iceRestart: !_relayFallbackTriggered });
         await pc.setLocalDescription(offer);
+        // ★ ICE restart時もTURN候補が揃うまで待つ（relay fallback時に特に重要）
+        await waitForIceGathering(pc, 2000);
         socket.emit('callOffer', { roomId, offer });
       } catch (e) {
         reportError('doIceRestart', e.message);
@@ -727,6 +777,7 @@
       pc = new RTCPeerConnection(iceConfig);
       _iceRestartCount = 0;
       _iceCandidateQueue = []; // ★ PC再作成時はキューをリセット
+      _sentCandidates   = []; // ★ 送信済み候補もリセット（relay fallback後の重複再送防止）
 
       // ローカルトラック追加
       localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
@@ -785,7 +836,10 @@
 
       // ICE候補
       pc.onicecandidate = ({ candidate }) => {
-        if (candidate) socket.emit('callIceCandidate', { roomId, candidate });
+        if (candidate) {
+          _sentCandidates.push(candidate); // ★ ソケット再接続後の再送に備えて記録
+          socket.emit('callIceCandidate', { roomId, candidate });
+        }
       };
       // ICE候補エラー（STUN到達不可 / TURNなし等）のログ
       pc.onicecandidateerror = (e) => {
@@ -861,12 +915,26 @@
       }, 1000);
     }
 
+    // ★ ICE収集が'complete'になるまで最大maxMs待つ（TURN候補が揃ってからオファー送信するため）
+    function waitForIceGathering(peerConn, maxMs = 2000) {
+      return new Promise(resolve => {
+        if (peerConn.iceGatheringState === 'complete') { resolve(); return; }
+        const done = () => { peerConn.removeEventListener('icegatheringstatechange', onChange); resolve(); };
+        const onChange = () => { if (peerConn.iceGatheringState === 'complete') done(); };
+        peerConn.addEventListener('icegatheringstatechange', onChange);
+        setTimeout(done, maxMs); // タイムアウトで強制突破（通常は1〜2秒以内）
+      });
+    }
+
     async function startWebRTC() {
       try {
         await loadIceServers();
         await initPC();
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
+        // ★ TURN候補が収集されるまで最大2秒待ってからオファー送信
+        // （早すぎると対称NATのrelay候補が揃わず接続失敗の原因になる）
+        await waitForIceGathering(pc, 2000);
         socket.emit('callOffer', { roomId, offer });
       } catch (e) {
         if (e.message !== 'mic denied') showError('通話の開始に失敗しました');
