@@ -26,7 +26,10 @@ const BLOCKED_EXT = new Set([
   '.exe', '.bat', '.cmd', '.com', '.msi', '.ps1', '.vbs', '.js', '.jse',
   '.sh', '.bash', '.zsh', '.fish', '.py', '.rb', '.pl', '.php',
   '.jar', '.class', '.war', '.ear', '.apk', '.ipa',
-  '.scr', '.pif', '.cpl', '.reg', '.inf', '.lnk', '.hta'
+  '.scr', '.pif', '.cpl', '.reg', '.inf', '.lnk', '.hta',
+  // ★ XSS防止: 同一オリジンで inline レンダリングされると <script> 実行可能
+  '.svg', '.svgz', '.html', '.htm', '.xhtml', '.xml', '.xsl', '.xslt',
+  '.mathml', '.mml',
 ]);
 
 // ブロックするMIMEタイプ（拡張子偽装対策）
@@ -40,6 +43,9 @@ const BLOCKED_MIME = new Set([
   // ★ JavaScriptのMIMEタイプ（拡張子ブロックと組み合わせて二重防御）
   'text/javascript', 'application/javascript', 'text/x-javascript',
   'application/ecmascript', 'text/ecmascript',
+  // ★ XSS防止: SVG/HTML は同一オリジンで script を実行できる
+  'image/svg+xml', 'image/svg', 'text/html', 'text/xml',
+  'application/xml', 'application/xhtml+xml', 'application/mathml+xml',
 ]);
 
 const upload = multer({
