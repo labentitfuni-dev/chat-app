@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v45">
+  <meta name="app-version" content="v46">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
@@ -1459,6 +1459,12 @@
         _ringtoneAudio.volume = 1.0;
         _ringtoneAudio.src = _buildRingtoneWav();
         _ringtoneAudio.load();
+        // ★ iOS必須: ユーザー操作中に play()→pause() してオーディオ要素をアンロック
+        // これをしないと着信時の play() が NotAllowedError になり無音になる
+        _ringtoneAudio.play().then(() => {
+          _ringtoneAudio.pause();
+          _ringtoneAudio.currentTime = 0;
+        }).catch(() => {}); // エラーは無視（着信時にリトライ）
         _ringtoneReady = true;
       }
       document.removeEventListener(ev, warmCtx);
@@ -1488,15 +1494,24 @@
   function playNotifSound(type = 'message') {
     const ctx = _getCtx();
     if (!ctx) return;
-    const now = ctx.currentTime + 0.04;
-    if (type === 'message') {
-      // かわいい3音チャイム ✨ E5→A5→C#6
-      _playNote(ctx, 659,  now,       0.09, 0.18);
-      _playNote(ctx, 880,  now + 0.1, 0.09, 0.20);
-      _playNote(ctx, 1109, now + 0.2, 0.20, 0.22);
+    const doPlay = () => {
+      const now = ctx.currentTime + 0.04;
+      if (type === 'message') {
+        // かわいい3音チャイム ✨ E5→A5→C#6
+        _playNote(ctx, 659,  now,       0.09, 0.18);
+        _playNote(ctx, 880,  now + 0.1, 0.09, 0.20);
+        _playNote(ctx, 1109, now + 0.2, 0.20, 0.22);
+      } else {
+        // 着信ビープ（createRingtone とは別の簡易版）
+        _playNote(ctx, 880, now, 0.15, 0.30);
+      }
+    };
+    // ★ iOS: AudioContext が suspended のまま鳴らすと無音になる
+    // resume() は非同期なので完了を待ってから音を鳴らす
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(doPlay).catch(() => {});
     } else {
-      // 着信ビープ（createRingtone とは別の簡易版）
-      _playNote(ctx, 880, now, 0.15, 0.30);
+      doPlay();
     }
   }
 
@@ -2204,6 +2219,19 @@
         if (isMobile()) {
           $('sidebar').classList.add('hidden');
           $('chat-panel').classList.add('show');
+        }
+
+      } else if (msg.type === 'push-message') {
+        // ★ SW経由メッセージ通知（ソケット切断時フォールバック）
+        // ソケット接続中なら receiveMessage で既にバナーが出るので重複防止チェック
+        if (!me || !msg.fromId) return;
+        if (currentContact?.id === msg.fromId) return; // 同じチャット表示中は不要
+        // ソケット経由で同じメッセージが直近500ms内に届いていなければバナー表示
+        const lastSocketMsg = messages[msg.fromId];
+        const lastTs = lastSocketMsg ? (lastSocketMsg[lastSocketMsg.length - 1]?.createdAt || 0) : 0;
+        if (Date.now() - new Date(lastTs).getTime() > 500) {
+          showInAppBanner({ fromId: msg.fromId, fromName: msg.fromName, text: msg.text });
+          playNotifSound('message');
         }
 
       } else if (msg.type === 'incoming-call-push') {

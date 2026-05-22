@@ -1,5 +1,5 @@
-const SW_VERSION = 23;
-const CACHE_NAME = 'cha-shell-v23';
+const SW_VERSION = 24;
+const CACHE_NAME = 'cha-shell-v24';
 const HTML_URLS  = ['/', '/call'];
 
 self.addEventListener('install', (event) => {
@@ -68,9 +68,18 @@ self.addEventListener('push', (event) => {
         });
       }
 
-      // フォアグラウンドかつメッセージ通知 → アプリ内バナーに任せるので抑制
-      // 着信・テスト・不在着信は常に表示
-      if (isVisible && !isCall && !isTest && !isMissedCall) return;
+      // フォアグラウンドかつメッセージ通知 → ページへ転送してアプリ内バナーを表示
+      // ソケットが切れていてもバナーが出るようにpostMessageでフォールバック
+      // 着信・テスト・不在着信は常にシステム通知として表示
+      if (isVisible && !isCall && !isTest && !isMissedCall) {
+        clientList.forEach(c => c.postMessage({
+          type:     'push-message',
+          fromId:   data.data?.fromId   || '',
+          fromName: data.data?.fromName || '',
+          text:     data.body           || '',
+        }));
+        return;
+      }
 
       const fromId = data.data?.fromId;
       const tag    = isCall       ? 'incoming-call'
