@@ -751,6 +751,25 @@
             audio.srcObject = stream; audio.volume = 1.0; audio.muted = isSpeakerOn;
             tryPlayAudio(audio);
           };
+          // ★ connectionState変化で音声を確実に再生（relay fallback後も対応）
+          pc.onconnectionstatechange = () => {
+            if (!pc) return;
+            if (pc.connectionState === 'connected') {
+              onCallConnected();
+              const audio = $('remote-audio');
+              if (audio.srcObject && !isSpeakerOn) tryPlayAudio(audio);
+            }
+          };
+          // ★ DataChannel受信（受信側はondatachannelで取得）
+          if (!isInit) {
+            pc.ondatachannel = (e) => {
+              _dataChannel = e.channel;
+              _dataChannel.onmessage = (ev) => {
+                if (ev.data === 'ping') { try { _dataChannel.send('pong'); } catch {} }
+                _lastPongTime = Date.now();
+              };
+            };
+          }
         }
 
         const offer = await pc.createOffer({ iceRestart: !_relayFallbackTriggered });
@@ -775,9 +794,10 @@
 
       if (pc) { try { pc.close(); } catch {} }
       pc = new RTCPeerConnection(iceConfig);
-      _iceRestartCount = 0;
-      _iceCandidateQueue = []; // ★ PC再作成時はキューをリセット
-      _sentCandidates   = []; // ★ 送信済み候補もリセット（relay fallback後の重複再送防止）
+      _iceRestartCount        = 0;
+      _iceCandidateQueue      = []; // ★ PC再作成時はキューをリセット
+      _sentCandidates         = []; // ★ 送信済み候補もリセット（relay fallback後の重複再送防止）
+      _relayFallbackTriggered = false; // ★ 新しいPCではrelay fallbackをリセット
 
       // ローカルトラック追加
       localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
