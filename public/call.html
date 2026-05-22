@@ -47,6 +47,34 @@
     .btn-end     { width: 76px; height: 76px; font-size: 32px; background: #e53935; color: white; }
     .btn-speaker { width: 64px; height: 64px; font-size: 26px; background: #2a2a3e; color: white; }
     .btn-speaker.active { background: #06C755; }
+    .btn-camera  { width: 64px; height: 64px; font-size: 26px; background: #2a2a3e; color: white; }
+    .btn-camera.active { background: #e53935; }
+
+    /* ===== ビデオ通話レイアウト ===== */
+    #video-overlay {
+      display: none; position: fixed; inset: 0; z-index: 0;
+      background: #000; flex-direction: column;
+    }
+    #remote-video {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    #local-video {
+      position: absolute; top: env(safe-area-inset-top, 16px); right: 12px;
+      width: 90px; height: 130px; border-radius: 14px;
+      object-fit: cover; border: 2px solid rgba(255,255,255,0.5);
+      z-index: 2; background: #111;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    /* ビデオ通話時: mainコンテンツをoverlay化 */
+    body.video-call #main {
+      position: fixed; inset: 0; z-index: 1;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.65) 100%);
+      pointer-events: none;
+    }
+    body.video-call #main .buttons { pointer-events: auto; }
+    body.video-call #main .avatar  { display: none; }
+    body.video-call #contact-name  { color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
+    body.video-call #status        { color: rgba(255,255,255,0.8); text-shadow: 0 2px 8px rgba(0,0,0,0.7); }
 
     #audio-banner {
       display: none; position: fixed; inset: 0; z-index: 100;
@@ -74,7 +102,12 @@
   </style>
 </head>
 <body>
-  <!-- playsinline + autoplay はブラウザのポリシーに従う。音声ウォッチドッグで確実に再生 -->
+  <!-- ビデオ通話レイヤー（video=trueのとき使用） -->
+  <div id="video-overlay">
+    <video id="remote-video" autoplay playsinline></video>
+    <video id="local-video"  autoplay muted playsinline></video>
+  </div>
+
   <audio id="remote-audio" autoplay playsinline></audio>
   <audio id="local-audio"  autoplay muted   playsinline></audio>
 
@@ -115,6 +148,16 @@
         </button>
         <span class="btn-label" id="speaker-label">スピーカー</span>
       </div>
+
+      <!-- ビデオ通話時のみ表示 -->
+      <div class="btn-wrap" id="camera-toggle-wrap" style="display:none">
+        <button class="btn btn-camera" id="camera-btn" onclick="toggleCamera()">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+            <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+          </svg>
+        </button>
+        <span class="btn-label" id="camera-label">カメラOFF</span>
+      </div>
     </div>
   </div>
 
@@ -132,12 +175,24 @@
     const params   = new URLSearchParams(location.search);
     const roomId   = params.get('room');
     const isInit   = params.get('initiator') === 'true';
-    const calleeId = params.get('to') || null; // 発信者のみ：着信側のuserId（不在着信メッセージ用）
+    const calleeId = params.get('to') || null;
     const token    = localStorage.getItem('token');
-    const me       = JSON.parse(localStorage.getItem('user') || '{}');
-    const $      = id => document.getElementById(id);
+    // ★ localStorage破損時のJSON.parseクラッシュをtry-catchで防止
+    let me = {};
+    try { me = JSON.parse(localStorage.getItem('user') || '{}'); } catch {}
+    const $        = id => document.getElementById(id);
+    // ★ hasVideo は使用前に宣言（TDZバグ修正）
+    const hasVideo = params.get('video') === 'true';
 
     if (!roomId || !token) { location.href = '/'; }
+    if (hasVideo) document.body.classList.add('video-call');
+
+    // ★ アバターURLサニタイズ（XSS対策: data:image/ または https:// のみ許可）
+    function sanitizeAvatarUrl(url) {
+      if (!url || typeof url !== 'string') return '';
+      if (url.startsWith('data:image/') || url.startsWith('https://')) return url;
+      return '';
+    }
 
     // 相手の情報を即座に表示
     (function showContactInfo() {
@@ -147,9 +202,10 @@
         if (!c.name) return;
         $('contact-name').textContent = c.name;
         const avatarEl = $('avatar');
-        if (c.avatar) {
+        const safeAvatar = sanitizeAvatarUrl(c.avatar);
+        if (safeAvatar) {
           const img = document.createElement('img');
-          img.src = c.avatar;
+          img.src = safeAvatar;
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
           img.onerror = () => { avatarEl.removeChild(img); avatarEl.textContent = c.name[0].toUpperCase(); };
           avatarEl.appendChild(img);
@@ -165,6 +221,7 @@
     let pc              = null;
     let localStream     = null;
     let isMuted         = false;
+    let isCameraOff     = false;
     let isSpeakerOn     = false;
     let timerSec        = 0;
     let timerInterval   = null;
@@ -172,23 +229,48 @@
     let partnerUserId   = null;
     let _audioCtx       = null;
     let _speakerSource  = null;
-    let _audioUnlocked  = false;   // ユーザータップで音声が解放されたか
-    let _audioWatchdog  = null;    // 音声ウォッチドッグタイマー
-    let _iceRestartTimer = null;   // ICE再接続タイマー
-    let _iceRestartCount = 0;      // ICE再接続試行回数
-    let _localStreamReady = false; // マイク準備完了フラグ
-    let _localStreamWaiters = [];  // マイク待ちPromiseのリゾルバ
-    let iceConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    let _audioUnlocked  = false;
+    let _audioWatchdog  = null;
+    let _iceRestartTimer       = null;
+    let _iceRestartCount       = 0;
+    let _iceRestartInProgress  = false; // ★ 再入防止フラグ（concurrent restart race対策）
+    let _iceCandidateQueue     = [];
+    let _localStreamReady      = false;
+    let _localStreamWaiters    = [];
+    let _iceCheckingTimer      = null; // ICE checkingが30秒超えたらrestart
+    let _keepAliveTimer     = null; // 接続後のKeep-alive監視
+    let _lastPongTime       = 0;
+    let _dataChannel        = null; // Keep-alive用DataChannel
+    // デフォルトSTUN（複数ソース・冗長化）
+    let iceConfig = { iceServers: [
+      { urls: 'stun:stun.l.google.com:19302'  },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:openrelay.metered.ca:80'  },
+    ] };
 
     // ══════════════════════════════════════════
     //  ICEサーバー読み込み
     // ══════════════════════════════════════════
     async function loadIceServers() {
       try {
-        const res = await fetch('/api/ice-servers');
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 6000); // 6秒タイムアウト
+        // ★ Authorizationヘッダー付与（TURNクレデンシャル取得のため認証必須）
+        const res = await fetch('/api/ice-servers', {
+          signal: controller.signal,
+          headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
+        clearTimeout(tid);
+        if (!res.ok) return; // フォールバックのまま
         const servers = await res.json();
-        if (Array.isArray(servers) && servers.length > 0) iceConfig = { iceServers: servers };
-      } catch {}
+        if (Array.isArray(servers) && servers.length > 0) {
+          iceConfig = { iceServers: servers };
+          const hasTurn = servers.some(s => String(s.urls).startsWith('turn'));
+          console.log('[ICE] サーバー取得:', servers.length + '件', hasTurn ? '(TURN含む)' : '(STUNのみ)');
+        }
+      } catch {} // タイムアウト or ネットワーク失敗 → デフォルトSTUNを使用
     }
 
     // ══════════════════════════════════════════
@@ -199,17 +281,94 @@
       return new Promise(resolve => _localStreamWaiters.push(resolve));
     }
 
-    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-      .then(stream => {
-        localStream = stream;
-        $('local-audio').srcObject = stream;
-        _localStreamReady = true;
-        _localStreamWaiters.forEach(r => r(stream));
-        _localStreamWaiters = [];
-      })
-      .catch(() => {
-        showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してから\nもう一度お試しください。');
+    const mediaConstraints = hasVideo
+      ? { audio: true, video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } }
+      : { audio: true, video: false };
+
+    function applyStream(stream) {
+      localStream = stream;
+      $('local-audio').srcObject = stream;
+      _localStreamReady = true;
+      _localStreamWaiters.forEach(r => r(stream));
+      _localStreamWaiters = [];
+      if (hasVideo && stream.getVideoTracks().length > 0) {
+        const lv = $('local-video');
+        if (lv) { lv.srcObject = stream; lv.play().catch(() => {}); }
+        $('video-overlay').style.display = 'flex';
+        $('camera-toggle-wrap').style.display = 'flex';
+      }
+    }
+
+    navigator.mediaDevices.getUserMedia(mediaConstraints)
+      .then(applyStream)
+      .catch((err) => {
+        reportError('getUserMedia failed', err.message);
+        // ビデオが失敗した場合、音声のみで再試行
+        if (hasVideo) {
+          $('status').textContent = 'カメラ不可 → 音声のみで接続中...';
+          navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+            .then(stream => {
+              applyStream(stream);
+              // ビデオオーバーレイは非表示のまま
+            })
+            .catch(() => showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してください。'));
+        } else {
+          showError('マイクの許可が必要です。\nブラウザの設定でマイクを許可してください。');
+        }
       });
+
+    // ══════════════════════════════════════════
+    //  エラーレポート（サーバーに送信）
+    // ══════════════════════════════════════════
+    function reportError(context, detail) {
+      try {
+        fetch('/api/errors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ context, detail: String(detail), page: 'call', ua: navigator.userAgent, ts: Date.now() })
+        }).catch(() => {});
+      } catch {}
+    }
+    window.onerror = (msg, src, line, col, err) => reportError('window.onerror', `${msg} @${src}:${line}`);
+    window.addEventListener('unhandledrejection', e => reportError('unhandledrejection', e.reason?.message || String(e.reason)));
+
+    // ══════════════════════════════════════════
+    //  ネットワーク監視（オフライン→オンライン復帰時に再接続）
+    // ══════════════════════════════════════════
+    window.addEventListener('online', () => {
+      $('status').textContent = 'ネットワーク復帰 → 再接続中...';
+      if (pc && (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected')) {
+        setTimeout(doIceRestart, 500);
+      } else if (!pc && socket.connected) {
+        socket.emit('joinCallRoom', { roomId, displayName: me.displayName || me.username, avatar: me.avatar || '' });
+      }
+    });
+    window.addEventListener('offline', () => {
+      $('status').textContent = 'ネットワーク切断...';
+    });
+
+    // ══════════════════════════════════════════
+    //  DataChannel Keep-alive
+    // ══════════════════════════════════════════
+    function startKeepAlive() {
+      stopKeepAlive();
+      _lastPongTime = Date.now();
+      _keepAliveTimer = setInterval(() => {
+        if (!pc || pc.connectionState !== 'connected') return;
+        // DataChannelが使えるなら ping
+        if (_dataChannel && _dataChannel.readyState === 'open') {
+          try { _dataChannel.send('ping'); } catch {}
+        }
+        // 最後のpongから30秒以上経過 → 接続が死んでいる可能性
+        if (_dataChannel && Date.now() - _lastPongTime > 30000) {
+          reportError('keepalive', 'pong timeout → ICE restart');
+          if (isInit) doIceRestart();
+        }
+      }, 5000);
+    }
+    function stopKeepAlive() {
+      if (_keepAliveTimer) { clearInterval(_keepAliveTimer); _keepAliveTimer = null; }
+    }
 
     // ══════════════════════════════════════════
     //  音声ウォッチドッグ（確実に再生し続ける）
@@ -305,8 +464,12 @@
     let _piroriTimer = null, _piroriPlaying = false;
 
     function _playPirori() {
+      if (!_piroriPlaying) return; // stopPirori()後のタイマー発火を防ぐ
       if (!_audioCtx || _audioCtx.state === 'closed') return;
-      if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
+      if (_audioCtx.state === 'suspended') {
+        _audioCtx.resume().then(() => { if (_piroriPlaying) _playPirori(); }).catch(() => {});
+        return;
+      }
       const seq = [
         { f: 587,  d: 0.11 }, { f: 784,  d: 0.11 }, { f: 988,  d: 0.11 }, { f: 1175, d: 0.20 },
         { f: 0,    d: 0.06 }, { f: 880,  d: 0.11 }, { f: 784,  d: 0.11 }, { f: 659,  d: 0.18 },
@@ -330,7 +493,21 @@
     function startPirori() {
       if (_piroriPlaying) return;
       _piroriPlaying = true;
-      if (_audioCtx && _audioCtx.state !== 'closed') _playPirori();
+      // AudioContextがない場合は作成を試みる（ユーザーアクション後ならブロックされない）
+      if (!_audioCtx || _audioCtx.state === 'closed') {
+        try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+      }
+      if (_audioCtx && _audioCtx.state !== 'closed') {
+        if (_audioCtx.state === 'suspended') {
+          // suspendedなら resume してから再生
+          _audioCtx.resume()
+            .then(() => { if (_piroriPlaying) _playPirori(); })
+            .catch(() => {}); // 失敗時は enableAudio() バナーに任せる
+        } else {
+          _playPirori();
+        }
+      }
+      // _audioCtxが作れない場合: enableAudio()タップ時に _piroriPlaying フラグを見て開始
     }
 
     function stopPirori() {
@@ -418,9 +595,10 @@
         $('contact-name').textContent = name;
         const avatarEl = $('avatar');
         avatarEl.innerHTML = '';
-        if (other.avatar) {
+        const safeOtherAvatar = sanitizeAvatarUrl(other.avatar);
+        if (safeOtherAvatar) {
           const img = document.createElement('img');
-          img.src = other.avatar;
+          img.src = safeOtherAvatar;
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
           img.onerror = () => { avatarEl.innerHTML = ''; avatarEl.textContent = name[0].toUpperCase(); };
           avatarEl.appendChild(img);
@@ -437,39 +615,104 @@
         await loadIceServers();
         await initPC();
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        await flushIceCandidateQueue(); // ★ キュー内の候補を追加
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         socket.emit('callAnswer', { roomId, answer });
-      } catch (e) { showError('接続に失敗しました'); }
+      } catch (e) {
+        console.error('[callOffer]', e);
+        showError('接続に失敗しました');
+      }
     });
 
     socket.on('callAnswer', async ({ answer }) => {
       try {
         if (pc && answer) {
           await pc.setRemoteDescription(new RTCSessionDescription(answer));
+          await flushIceCandidateQueue(); // ★ キュー内の候補を追加
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[callAnswer]', e);
+      }
     });
 
     socket.on('callIceCandidate', async ({ candidate }) => {
+      if (!candidate) return;
       try {
-        if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch {}
+        if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+          // remoteDescriptionが確定済み → 即座に追加
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } else {
+          // ★ まだremoteDescription未確定 → キューに積む（ここが通話失敗の主因だった）
+          _iceCandidateQueue.push(candidate);
+        }
+      } catch (e) {
+        console.warn('[ICE] addIceCandidate failed:', e.message);
+      }
     });
 
+    // キューに積まれたICE候補を全てflushする
+    async function flushIceCandidateQueue() {
+      while (_iceCandidateQueue.length > 0) {
+        const candidate = _iceCandidateQueue.shift();
+        try {
+          if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch {}
+      }
+    }
+
     socket.on('callHangup', () => endCall(false));
+
+    // ★ 通話室が満員（3人目以降の参加を拒否）
+    socket.on('callRoomFull', () => {
+      showError('この通話は既に接続中のため参加できません');
+    });
 
     // ══════════════════════════════════════════
     //  ICE再接続
     // ══════════════════════════════════════════
+    const ICE_RESTART_MAX = 8; // 最大ICE再起動回数（ネットワーク不安定時の粘り強さ向上）
+
     async function doIceRestart() {
-      if (!pc || _iceRestartCount >= 3) return;
+      if (!pc) return;
+      // ★ 再入防止: 既にrestart実行中なら無視（concurrent呼び出しによるInvalidStateError防止）
+      if (_iceRestartInProgress) return;
+      if (_iceRestartCount >= ICE_RESTART_MAX) {
+        // 上限回数リトライしても繋がらない → ユーザーに通知して終話
+        reportError('ice-give-up', `gave up after ${_iceRestartCount} restarts`);
+        $('status').textContent = '接続できませんでした。通話を終了します';
+        setTimeout(() => endCall(false), 2000);
+        return;
+      }
+      _iceRestartInProgress = true;
       _iceRestartCount++;
+      $('status').textContent = `再接続中... (${_iceRestartCount}/${ICE_RESTART_MAX})`;
       try {
+        // socketが切れている場合は接続を待つ（最大10秒 — 無限waitによるリスナーリーク防止）
+        if (!socket.connected) {
+          socket.connect();
+          const didConnect = await new Promise(resolve => {
+            let settled = false;
+            const onConn = () => { if (!settled) { settled = true; clearTimeout(tid); resolve(true); } };
+            const tid = setTimeout(() => { if (!settled) { settled = true; socket.off('connect', onConn); resolve(false); } }, 10000);
+            socket.once('connect', onConn);
+          });
+          if (!didConnect) {
+            reportError('doIceRestart', 'socket reconnect timeout');
+            return;
+          }
+          // 再接続後、call roomに再参加
+          socket.emit('joinCallRoom', { roomId, displayName: me.displayName || me.username, avatar: me.avatar || '' });
+          await new Promise(r => setTimeout(r, 1000)); // room ready を待つ
+        }
         const offer = await pc.createOffer({ iceRestart: true });
         await pc.setLocalDescription(offer);
         socket.emit('callOffer', { roomId, offer });
-      } catch {}
+      } catch (e) {
+        reportError('doIceRestart', e.message);
+      } finally {
+        _iceRestartInProgress = false; // ★ 完了・失敗いずれでも必ずリセット
+      }
     }
 
     // ══════════════════════════════════════════
@@ -483,23 +726,35 @@
       if (pc) { try { pc.close(); } catch {} }
       pc = new RTCPeerConnection(iceConfig);
       _iceRestartCount = 0;
+      _iceCandidateQueue = []; // ★ PC再作成時はキューをリセット
 
       // ローカルトラック追加
       localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
       // リモートトラック受信
+      let _remoteStream = null;
       pc.ontrack = e => {
-        const audio = $('remote-audio');
         const stream = e.streams[0] || new MediaStream([e.track]);
 
-        // 同じstreamなら再設定しない（二重再生防止）
-        if (audio.srcObject && audio.srcObject.id === stream.id) return;
+        // ビデオトラックはリモートビデオ要素に設定
+        if (e.track.kind === 'video') {
+          const rv = $('remote-video');
+          if (rv) {
+            rv.srcObject = stream;
+            rv.play().catch(() => {});
+            $('video-overlay').style.display = 'flex';
+          }
+          return;
+        }
 
+        // オーディオトラック
+        const audio = $('remote-audio');
+        if (audio.srcObject && audio.srcObject.id === stream.id) return;
+        _remoteStream = stream;
         audio.srcObject = stream;
         audio.volume    = 1.0;
         audio.muted     = isSpeakerOn;
 
-        // スピーカーモードON中なら再接続
         if (isSpeakerOn && _audioCtx && _audioCtx.state === 'running') {
           if (_speakerSource) { try { _speakerSource.disconnect(); } catch {} }
           try {
@@ -511,31 +766,68 @@
         tryPlayAudio(audio);
       };
 
+      // DataChannel keep-alive（発信者側が作成、受信側は ondatachannel で受け取る）
+      if (isInit) {
+        try {
+          _dataChannel = pc.createDataChannel('keepalive', { ordered: false, maxRetransmits: 0 });
+          _dataChannel.onmessage = () => { _lastPongTime = Date.now(); };
+          _dataChannel.onerror  = () => {};
+        } catch {}
+      } else {
+        pc.ondatachannel = (e) => {
+          _dataChannel = e.channel;
+          _dataChannel.onmessage = (ev) => {
+            if (ev.data === 'ping') { try { _dataChannel.send('pong'); } catch {} }
+            _lastPongTime = Date.now();
+          };
+        };
+      }
+
       // ICE候補
       pc.onicecandidate = ({ candidate }) => {
         if (candidate) socket.emit('callIceCandidate', { roomId, candidate });
+      };
+      // ICE候補エラー（STUN到達不可 / TURNなし等）のログ
+      pc.onicecandidateerror = (e) => {
+        // errorCode 701 = STUN binding失敗（対称NATでよく出る）
+        if (e.errorCode && e.errorCode !== 701) {
+          reportError('icecandidateerror', `code=${e.errorCode} url=${e.url}`);
+        }
       };
 
       // ICE接続状態
       pc.oniceconnectionstatechange = () => {
         if (!pc) return;
         const s = pc.iceConnectionState;
-        if (s === 'checking')    { $('status').textContent = '接続中...'; }
+        if (s === 'checking') {
+          $('status').textContent = '接続中...';
+          // ★ 30秒以上checkingならICE restart（NAT越えに失敗している場合）
+          if (_iceCheckingTimer) clearTimeout(_iceCheckingTimer);
+          _iceCheckingTimer = setTimeout(() => {
+            if (pc && pc.iceConnectionState === 'checking') {
+              reportError('ice-timeout', 'checking > 30s → restart');
+              if (isInit) doIceRestart();
+            }
+          }, 30000);
+        }
         if (s === 'connected' || s === 'completed') {
-          if (_iceRestartTimer) { clearTimeout(_iceRestartTimer); _iceRestartTimer = null; }
+          if (_iceCheckingTimer) { clearTimeout(_iceCheckingTimer); _iceCheckingTimer = null; }
+          if (_iceRestartTimer)  { clearTimeout(_iceRestartTimer);  _iceRestartTimer  = null; }
           _iceRestartCount = 0;
           onCallConnected();
-          // 接続確立時に音声ウォッチドッグ起動
+          startKeepAlive();
           if (!isSpeakerOn) startAudioWatchdog();
         }
         if (s === 'disconnected') {
           $('status').textContent = '再接続中...';
-          // 4秒後にICE再接続（発信者がオファーを送り直す）
+          stopKeepAlive();
           if (_iceRestartTimer) clearTimeout(_iceRestartTimer);
+          // 4秒後にICE再接続
           if (isInit) _iceRestartTimer = setTimeout(doIceRestart, 4000);
         }
         if (s === 'failed') {
-          // 即座にICE再接続を試みる
+          stopKeepAlive();
+          reportError('ice-failed', `restart#${_iceRestartCount}`);
           if (isInit) doIceRestart();
           else $('status').textContent = '接続が切れました';
         }
@@ -591,6 +883,24 @@
       $('mute-slash').style.display = isMuted ? 'block' : 'none';
       $('mute-label').textContent   = isMuted ? 'ミュート中' : 'ミュート';
       $('mute-btn').classList.toggle('active', isMuted);
+      // ミュート中はスピーカーON不可（混乱を避けるため）
+      const spkBtn = $('speaker-btn');
+      spkBtn.disabled = isMuted;
+      spkBtn.style.opacity = isMuted ? '0.35' : '1';
+      if (isMuted && isSpeakerOn) toggleSpeaker(); // スピーカーもオフに
+    }
+
+    // ══════════════════════════════════════════
+    //  カメラ切替（ビデオ通話用）
+    // ══════════════════════════════════════════
+    function toggleCamera() {
+      if (!localStream) return;
+      isCameraOff = !isCameraOff;
+      localStream.getVideoTracks().forEach(t => { t.enabled = !isCameraOff; });
+      const btn = $('camera-btn');
+      const lbl = document.getElementById('camera-label');
+      if (btn) btn.classList.toggle('active', isCameraOff);
+      if (lbl) lbl.textContent = isCameraOff ? 'カメラON' : 'カメラOFF';
     }
 
     // ══════════════════════════════════════════
@@ -599,12 +909,19 @@
     function endCall(notify = true) {
       stopPirori();
       stopAudioWatchdog();
-      if (_iceRestartTimer) { clearTimeout(_iceRestartTimer); _iceRestartTimer = null; }
+      stopKeepAlive();
+      if (waitingTimeoutId)  { clearTimeout(waitingTimeoutId);  waitingTimeoutId  = null; }
+      if (_iceRestartTimer)  { clearTimeout(_iceRestartTimer);  _iceRestartTimer  = null; }
+      if (_iceCheckingTimer) { clearTimeout(_iceCheckingTimer); _iceCheckingTimer = null; }
+      if (_dataChannel) { try { _dataChannel.close(); } catch {} _dataChannel = null; }
       if (notify) socket.emit('callHangup', { roomId });
       if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
       if (localStream)   { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
       if (pc)            { pc.close(); pc = null; }
+      _iceCandidateQueue = [];
       if (_speakerSource) { try { _speakerSource.disconnect(); } catch {} _speakerSource = null; }
+      const rv = $('remote-video'); if (rv) rv.srcObject = null;
+      const lv = $('local-video');  if (lv) lv.srcObject = null;
 
       const audio = $('remote-audio');
       if (audio) { audio.srcObject = null; }
@@ -639,8 +956,11 @@
 
     window.addEventListener('beforeunload', () => { if (pc) endCall(true); });
 
-    // 最初のタップで音声バナーを表示
-    $('audio-banner').style.display = 'flex';
+    // 音声バナー: 1秒後に自動再生が成功しなかった場合のみ表示する
+    // （Desktop: 一瞬チラつきを防ぐ / iOS: 確実に表示）
+    setTimeout(() => {
+      if (!_audioUnlocked) $('audio-banner').style.display = 'flex';
+    }, 1200);
   </script>
 </body>
 </html>

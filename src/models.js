@@ -19,8 +19,14 @@ const messageSchema = new mongoose.Schema({
   file:     { type: Object, default: null },
   read:            { type: Boolean, default: false },
   deletedBySender: { type: Boolean, default: false },
+  deletedFor:      [{ type: String }],   // 自分だけ削除（相手には残る）
   isMissedCall:    { type: Boolean, default: false },
 }, { timestamps: true });
+
+// パフォーマンス最適化: メッセージ取得クエリで使うフィールドにインデックス
+// getMessages: { fromId, toId } の組み合わせで検索 → 複合インデックス
+messageSchema.index({ fromId: 1, toId: 1, createdAt: 1 });
+messageSchema.index({ toId: 1, fromId: 1, createdAt: 1 });
 
 const pushSubSchema = new mongoose.Schema({
   userId:       { type: String, required: true, index: true },
