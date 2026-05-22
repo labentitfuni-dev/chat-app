@@ -7,7 +7,8 @@
     const hash = location.hash.slice(1);
     const params = new URLSearchParams(hash);
     const idToken = params.get('id_token');
-    if (idToken && window.opener) {
+    // ★ 長さ制限: Google ID token は通常1〜4KB。巨大なフラグメントによるopenerへの不正送信を防止
+    if (idToken && typeof idToken === 'string' && idToken.length <= 4096 && window.opener) {
       window.opener.postMessage({ type: 'google-credential', credential: idToken }, location.origin);
     }
   } catch(e) {}

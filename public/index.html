@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v40">
+  <meta name="app-version" content="v41">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
@@ -874,7 +874,8 @@
     const left = Math.max(0, (screen.width - width) / 2);
     const top = Math.max(0, (screen.height - height) / 2);
     const popup = window.open(
-      `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(location.origin + '/google-callback')}&response_type=id_token&scope=openid%20email%20profile&nonce=${Math.random().toString(36).slice(2)}`,
+      // ★ nonce は crypto.getRandomValues() で生成（Math.random() は予測可能なためOIDC仕様に非推奨）
+      `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(location.origin + '/google-callback')}&response_type=id_token&scope=openid%20email%20profile&nonce=${Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('')}`,
       'google-login',
       `width=${width},height=${height},left=${left},top=${top}`
     );
@@ -953,30 +954,14 @@
   }
 
   // ========== アバター ==========
-  function avatarInitial(name, size) {
-    const letter = (name || '?')[0].toUpperCase();
-    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#3D9A6A;display:flex;align-items:center;justify-content:center;color:white;font-size:${Math.floor(size*0.4)}px;font-weight:bold;">${letter}</div>`;
-  }
-
   // アバターURLをサニタイズ（XSS対策）
   function sanitizeAvatarUrl(url) {
     if (!url || typeof url !== 'string') return '';
     if (url.startsWith('data:image/') || url.startsWith('https://')) return url;
     return ''; // 不正なURLは空文字に置換
   }
-
-  // avatarHtml: 安全のためDOM要素を返す（innerHTML使用箇所はappendChildで追加する）
-  // ★ onerrorにname文字列を埋め込まずDOM APIを使用（XSS対策）
-  function avatarHtml(user, size = 44) {
-    const name = user.displayName || user.username || '?';
-    const safeUrl = sanitizeAvatarUrl(user.avatar);
-    if (safeUrl) {
-      // img要素をHTML文字列で返す場合、エラー時フォールバックはdata属性で安全に渡す
-      const esc = escapeHtml;
-      return `<img src="${esc(safeUrl)}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;" data-initial="${esc(name[0].toUpperCase())}" data-fsize="${size}" onerror="this.outerHTML=this.dataset.initial">`;
-    }
-    return avatarInitial(name, size);
-  }
+  // ★ avatarInitial / avatarHtml は使われていなかった（全箇所でインライン実装に置換済み）。
+  //    avatarInitial は ${letter} を非エスケープで innerHTML に挿入するため削除。
 
   function renderMyAvatar() {
     const el = $('my-avatar');
