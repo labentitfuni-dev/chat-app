@@ -2,13 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#3D9A6A">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v31-keyboard-fix7">
+  <meta name="app-version" content="v42">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <title>CHA</title>
@@ -25,7 +25,8 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
-    body { background: #f0f0f0; min-height: 100vh; display: flex; flex-direction: column; }
+    html { touch-action: pan-x pan-y; } /* ピンチズーム無効 */
+    body { background: #f0f0f0; min-height: 100vh; display: flex; flex-direction: column; overscroll-behavior: none; -webkit-overflow-scrolling: touch; }
 
     /* ===== ローディング画面 ===== */
     #loading-screen {
@@ -120,7 +121,13 @@
     #my-avatar-wrap { position: relative; flex-shrink: 0; cursor: pointer; }
     #my-avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--avatar-bg); display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; font-weight: 700; overflow: hidden; box-shadow: 0 3px 10px rgba(61,154,106,0.28); }
     #my-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-    #my-avatar-edit { display: none; }
+    #my-avatar-edit {
+      position: absolute; bottom: 0; right: 0;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--green); border: 2px solid white;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
     #my-info-text { flex: 1; min-width: 0; }
     #my-info-name { font-size: 15px; color: #111; font-weight: 700; letter-spacing: -0.2px; }
     #my-info-code { font-size: 11px; color: #999; margin-top: 3px; display: flex; align-items: center; gap: 6px; }
@@ -143,8 +150,8 @@
     #chat-panel { flex: 1; display: flex; flex-direction: column; }
     #chat-header { background: var(--hdr); color: white; padding: 12px 16px; display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.22); }
     #chat-header h3 { flex: 1; font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
-    #call-btn, #delete-chat-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
-    #call-btn:active, #delete-chat-btn:active { background: rgba(255,255,255,0.18); }
+    #call-btn, #video-call-btn, #delete-chat-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+    #call-btn:active, #video-call-btn:active, #delete-chat-btn:active { background: rgba(255,255,255,0.18); }
     #no-chat { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ccc; gap: 14px; background: #f0f1f3; }
     #no-chat-add { background: var(--btn-bg); color: white; border: none; border-radius: 20px; padding: 10px 22px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: var(--btn-shadow); }
 
@@ -209,6 +216,9 @@
     #msg-input:focus { border-color: var(--green); }
     #send-btn { width: 38px; height: 38px; background: var(--btn-bg); color: white; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity 0.15s, transform 0.1s; box-shadow: 0 3px 12px rgba(61,154,106,0.42); }
     #send-btn:active { opacity: 0.85; transform: scale(0.93); }
+    #newline-btn { background: none; border: none; cursor: pointer; padding: 0; color: #aaa; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; display: none; align-items: center; justify-content: center; font-size: 18px; transition: color 0.15s; }
+    #newline-btn:active { color: var(--green); }
+    @media (max-width: 600px) { #newline-btn { display: flex; } }
 
     /* ===== インストールガイド ===== */
     #install-guide-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); justify-content: center; align-items: flex-end; z-index: 400; }
@@ -447,7 +457,7 @@
         <input type="file" id="avatar-input" accept="image/*" style="display:none">
         <div id="my-avatar-wrap" title="アイコンを変更">
           <div id="my-avatar"></div>
-          <div id="my-avatar-edit">✏</div>
+          <div id="my-avatar-edit"><svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M12 15.2A3.2 3.2 0 1 0 12 8.8a3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg></div>
         </div>
         <div id="my-info-text">
           <div id="my-info-name"></div>
@@ -493,6 +503,9 @@
       <button id="delete-chat-btn" title="トークを削除">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
       </button>
+      <button id="video-call-btn" title="ビデオ通話">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+      </button>
       <button id="call-btn" title="音声通話">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
       </button>
@@ -510,6 +523,7 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
       <textarea id="msg-input" placeholder="メッセージを入力..." rows="1"></textarea>
+      <button id="newline-btn" title="改行" type="button">↵</button>
       <button id="send-btn" title="送信">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
       </button>
@@ -555,6 +569,10 @@
       <div class="settings-row-label">ホーム画面に追加</div>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="#aaa"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
     </div>
+    <div class="settings-row" style="cursor:pointer" onclick="shareApp()">
+      <div class="settings-row-label">📤 アプリを友達に共有</div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#aaa"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+    </div>
     <div class="settings-row" style="cursor:pointer" onclick="closeSettings();openDiagModal()">
       <div class="settings-row-label">🔧 自動診断・バグ修正</div>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="#aaa"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
@@ -591,7 +609,7 @@
 <div class="modal-overlay" id="delete-chat-modal">
   <div class="modal-box">
     <h3>🗑 トークを削除</h3>
-    <p style="text-align:center;color:#888;font-size:14px;margin-bottom:20px"><strong id="delete-chat-name"></strong> とのトーク履歴をすべて削除しますか？<br><small style="color:#bbb">この操作は元に戻せません</small></p>
+    <p style="text-align:center;color:#888;font-size:14px;margin-bottom:20px"><strong id="delete-chat-name"></strong> とのトーク履歴を自分の画面から削除しますか？<br><small style="color:#bbb">相手の画面には残ります。この操作は元に戻せません</small></p>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="$('delete-chat-modal').style.display='none'">キャンセル</button>
       <button class="btn-confirm" style="background:#e53935" id="delete-chat-confirm">削除</button>
@@ -733,8 +751,57 @@
 <script>
   const $ = id => document.getElementById(id);
   let token = localStorage.getItem('token');
-  let me = JSON.parse(localStorage.getItem('user') || 'null');
+  // ★ localStorage破損時のJSON.parseクラッシュをtry-catchで防止
+  let me = null;
+  try { me = JSON.parse(localStorage.getItem('user') || 'null'); } catch {}
   let socket = null;
+
+  // ── エラーレポート（バグ確率削減のための可視化） ─────────────
+  window._diagErrors = []; // 診断パネル用エラー蓄積（起動後のJSエラーを記録）
+
+  // ── トークン期限切れ検出（全fetchに適用） ──────────────────
+  // グローバルfetchをラップしてAPIの401を捕捉、自動ログアウト
+  const _nativeFetch = window.fetch.bind(window);
+  let _authExpiredHandled = false;
+  window.fetch = async function(url, opts) {
+    const res = await _nativeFetch(url, opts);
+    // /api/auth/* の401はdoAuth等で個別ハンドルするため除外
+    if (res.status === 401 && typeof url === 'string' && url.includes('/api/') && !url.includes('/api/auth/')) {
+      if (!_authExpiredHandled) {
+        _authExpiredHandled = true;
+        // クローンを作りレスポンスを使い切らずに返す
+        const clone = res.clone();
+        clone.json().then(d => {
+          if (d.error === 'トークンが無効です' || d.error === 'unauthorized' || d.error === '認証が必要です') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            alert('ログインの有効期限が切れました。再度ログインしてください。');
+            location.reload();
+          } else {
+            _authExpiredHandled = false;
+          }
+        }).catch(() => { _authExpiredHandled = false; });
+      }
+    }
+    return res;
+  };
+
+  function reportError(context, detail) {
+    const msg = `${context}: ${String(detail)}`;
+    // 診断パネル用に記録（最新20件）
+    window._diagErrors.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+    if (window._diagErrors.length > 20) window._diagErrors.shift();
+    try {
+      const tok = localStorage.getItem('token');
+      fetch('/api/errors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(tok ? { 'Authorization': 'Bearer ' + tok } : {}) },
+        body: JSON.stringify({ context, detail: String(detail), page: 'index', ua: navigator.userAgent, ts: Date.now() })
+      }).catch(() => {});
+    } catch {}
+  }
+  window.onerror = (msg, src, line) => { reportError('window.onerror', `${msg} @${src}:${line}`); return false; };
+  window.addEventListener('unhandledrejection', e => reportError('unhandledrejection', e.reason?.message || String(e.reason)));
   let currentContact = null;
   let messages = {};
   let friends = [];
@@ -758,23 +825,37 @@
     if (authBusy) return;
     const username = $('username-input').value.trim();
     const password = $('password-input').value.trim();
-    const displayName = $('displayname-input').value.trim();
+    const displayName = ($('displayname-input')?.value || '').trim();
     if (!username || !password) { showError('ユーザー名とパスワードを入力してください'); return; }
+    // クライアント側バリデーション（サーバーと同じルール）
+    if (!isLogin) {
+      if (username.length < 3 || username.length > 32) { showError('ユーザー名は3〜32文字にしてください'); return; }
+      if (!/^[a-zA-Z0-9_.@-]+$/.test(username)) { showError('ユーザー名は半角英数字・記号(._@-)のみ使用できます'); return; }
+      if (password.length < 6) { showError('パスワードは6文字以上にしてください'); return; }
+      if (displayName.length > 50) { showError('表示名は50文字以内にしてください'); return; }
+    }
     authBusy = true;
     $('auth-btn').disabled = true;
     $('auth-btn').textContent = '処理中...';
     try {
+      // 10秒タイムアウト（遅いネットワークで無限待機防止）
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(`/api/auth/${isLogin ? 'login' : 'register'}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, displayName })
+        body: JSON.stringify({ username, password, displayName }),
+        signal: controller.signal
       });
+      clearTimeout(tid);
       const data = await res.json();
       if (!res.ok) { showError(data.error || 'エラーが発生しました'); return; }
       token = data.token; me = data.user;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(me));
       startApp();
-    } catch { showError('サーバーに接続できません'); }
+    } catch (e) {
+      showError(e.name === 'AbortError' ? 'タイムアウト — 接続を確認してください' : 'サーバーに接続できません');
+    }
     finally {
       authBusy = false;
       $('auth-btn').disabled = false;
@@ -793,7 +874,8 @@
     const left = Math.max(0, (screen.width - width) / 2);
     const top = Math.max(0, (screen.height - height) / 2);
     const popup = window.open(
-      `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(location.origin + '/google-callback')}&response_type=id_token&scope=openid%20email%20profile&nonce=${Math.random().toString(36).slice(2)}`,
+      // ★ nonce は crypto.getRandomValues() で生成（Math.random() は予測可能なためOIDC仕様に非推奨）
+      `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(location.origin + '/google-callback')}&response_type=id_token&scope=openid%20email%20profile&nonce=${Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('')}`,
       'google-login',
       `width=${width},height=${height},left=${left},top=${top}`
     );
@@ -806,17 +888,23 @@
     $('google-btn').disabled = true;
     $('google-btn').textContent = '処理中...';
     try {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 10000);
       const res = await fetch('/api/auth/google', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential })
+        body: JSON.stringify({ credential }),
+        signal: controller.signal
       });
+      clearTimeout(tid);
       const data = await res.json();
       if (!res.ok) { showError(data.error || 'Googleログインに失敗しました'); return; }
       token = data.token; me = data.user;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(me));
       startApp();
-    } catch { showError('サーバーに接続できません'); }
+    } catch (e) {
+      showError(e.name === 'AbortError' ? 'タイムアウト — 接続を確認してください' : 'サーバーに接続できません');
+    }
     finally {
       $('google-btn').disabled = false;
       $('google-btn').innerHTML = `<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg> Googleでログイン`;
@@ -836,30 +924,65 @@
     fetchFriends();
     registerPush();
     showIosBannerIfNeeded();
+    // ★ トークン有効期限を確認（残り3日以内 → 自動再ログインを促す）
+    _scheduleTokenExpiryCheck();
+  }
+
+  function _scheduleTokenExpiryCheck() {
+    if (!token) return;
+    try {
+      // JWTのpayload部分をデコード（base64url → JSON）
+      const parts = token.split('.');
+      if (parts.length !== 3) return;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload.exp) return;
+      const expiresIn = payload.exp * 1000 - Date.now(); // ms
+      const threeDays = 3 * 24 * 60 * 60 * 1000;
+      if (expiresIn <= 0) {
+        // 既に期限切れ → ログアウト
+        localStorage.removeItem('token'); localStorage.removeItem('user');
+        location.reload();
+      } else if (expiresIn < threeDays) {
+        // 残り3日未満 → トースト通知（非侵入的）
+        setTimeout(() => showToast('⚠️ ログインの有効期限が近づいています。再ログインをお勧めします'), 3000);
+      } else {
+        // 残り期限の80%経過時点でチェック（最大24時間後まで）
+        const checkIn = Math.min(expiresIn * 0.8, 24 * 60 * 60 * 1000);
+        setTimeout(_scheduleTokenExpiryCheck, checkIn);
+      }
+    } catch {} // JWTデコード失敗は無視
   }
 
   // ========== アバター ==========
-  function avatarInitial(name, size) {
-    const letter = (name || '?')[0].toUpperCase();
-    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#3D9A6A;display:flex;align-items:center;justify-content:center;color:white;font-size:${Math.floor(size*0.4)}px;font-weight:bold;">${letter}</div>`;
+  // アバターURLをサニタイズ（XSS対策）
+  function sanitizeAvatarUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('data:image/') || url.startsWith('https://')) return url;
+    return ''; // 不正なURLは空文字に置換
   }
-
-  function avatarHtml(user, size = 44) {
-    const name = user.displayName || user.username || '?';
-    if (user.avatar) {
-      return `<img src="${user.avatar}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML='${avatarInitial(name, size).replace(/'/g, "\\'")}'">`;
-    }
-    return avatarInitial(name, size);
-  }
+  // ★ avatarInitial / avatarHtml は使われていなかった（全箇所でインライン実装に置換済み）。
+  //    avatarInitial は ${letter} を非エスケープで innerHTML に挿入するため削除。
 
   function renderMyAvatar() {
     const el = $('my-avatar');
-    const name = (me.displayName || me.username || '?')[0].toUpperCase();
-    if (me.avatar) {
-      el.innerHTML = `<img src="${me.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentElement.innerHTML='${name}';this.parentElement.style.background='#3D9A6A'">`;
+    const initial = (me.displayName || me.username || '?')[0].toUpperCase();
+    const safeMyAvatar = sanitizeAvatarUrl(me.avatar);
+    if (safeMyAvatar) {
+      // DOM APIで組み立て（onerror属性に文字列を埋め込まない）
+      el.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = safeMyAvatar;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+      img.onerror = () => {
+        el.innerHTML = '';
+        el.textContent = initial;
+        el.style.background = '#3D9A6A';
+      };
+      el.appendChild(img);
       el.style.background = 'transparent';
     } else {
-      el.innerHTML = name;
+      el.innerHTML = '';
+      el.textContent = initial;
       el.style.background = '#3D9A6A';
     }
   }
@@ -871,7 +994,7 @@
     const file = e.target.files[0];
     if (!file) return;
     try {
-      $('my-avatar-edit').textContent = '…';
+      $('my-avatar-edit').innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="white"><circle cx="12" cy="12" r="8" fill="none" stroke="white" stroke-width="3" stroke-dasharray="40" stroke-dashoffset="10"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.8s" repeatCount="indefinite"/></circle></svg>';
       // 画像をcanvasで圧縮してbase64に変換（サーバー再起動でも消えない）
       const base64 = await resizeAndEncodeImage(file, 256);
       await fetch('/api/auth/avatar', {
@@ -884,7 +1007,7 @@
       renderMyAvatar();
       showToast('アイコンを変更しました');
     } catch { showToast('変更に失敗しました'); }
-    finally { $('my-avatar-edit').textContent = '✏'; $('avatar-input').value = ''; }
+    finally { $('my-avatar-edit').innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M12 15.2A3.2 3.2 0 1 0 12 8.8a3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>'; $('avatar-input').value = ''; }
   };
 
   function resizeAndEncodeImage(file, maxSize) {
@@ -899,7 +1022,7 @@
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/jpeg', 0.92)); // 高画質
       };
       img.onerror = reject;
       img.src = url;
@@ -987,6 +1110,8 @@
         });
         if (res.ok) {
           friends = friends.filter(f => f.id !== u.id);
+          // メモリリーク修正: 削除した友達のメッセージキャッシュを解放
+          delete messages[u.id];
           if (currentContact?.id === u.id) {
             currentContact = null;
             $('chat-panel').classList.remove('show');
@@ -1034,9 +1159,12 @@
       div.className = 'contact-item' + (currentContact?.id === u.id ? ' active' : '');
       div.dataset.uid = u.id;
       const isOnline = onlineSet.has(u.id);
+      const safeAvatar = sanitizeAvatarUrl(u.avatar);
+      const uInitial = (u.displayName||u.username||'?')[0].toUpperCase();
+      // ★ onerrorにname文字列を埋め込まずdata属性経由で渡す（XSS対策: 引用符エスケープ不要）
       div.innerHTML = `
-        <div class="avatar" style="position:relative;background:${u.avatar?'transparent':'#3D9A6A'}">
-          ${u.avatar ? `<img src="${u.avatar}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.style.background='#3D9A6A';this.parentElement.insertAdjacentText('afterbegin','${(u.displayName||u.username||'?')[0].toUpperCase()}')">` : (u.displayName||u.username||'?')[0].toUpperCase()}
+        <div class="avatar" style="position:relative;background:${safeAvatar?'transparent':'#3D9A6A'}">
+          ${safeAvatar ? `<img src="${escapeHtml(safeAvatar)}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;" data-initial="${escapeHtml(uInitial)}" onerror="this.style.display='none';this.parentElement.style.background='#3D9A6A';this.parentElement.insertAdjacentText('afterbegin',this.dataset.initial)">` : escapeHtml(uInitial)}
           ${isOnline ? '<span class="online-dot"></span>' : ''}
         </div>
         <div class="contact-info">
@@ -1130,14 +1258,21 @@
   }
 
   async function onHideContentToggle(checked) {
-    await fetch('/api/auth/notif-setting', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ hideNotifContent: checked })
-    });
-    me.hideNotifContent = checked;
-    localStorage.setItem('user', JSON.stringify(me));
-    showToast(checked ? '通知の内容を非表示にしました' : '通知の内容を表示するようにしました');
+    try {
+      const res = await fetch('/api/auth/notif-setting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ hideNotifContent: checked })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status); // ★ HTTPエラーもcatchへ
+      me.hideNotifContent = checked;
+      localStorage.setItem('user', JSON.stringify(me));
+      showToast(checked ? '通知の内容を非表示にしました' : '通知の内容を表示するようにしました');
+    } catch {
+      showToast('⚠️ 設定の保存に失敗しました');
+      // チェックボックスを元に戻す（UIと実際の状態を一致させる）
+      $('hide-content-toggle').checked = !checked;
+    }
   }
 
   function doLogout() {
@@ -1251,6 +1386,10 @@
     if (isMobile()) { $('sidebar').classList.add('hidden'); $('chat-panel').classList.add('show'); }
     renderFriends();
     if (!messages[contact.id]) messages[contact.id] = [];
+    // キャッシュ済みメッセージを先に即表示→固まり感を解消
+    if (messages[contact.id].length > 0) {
+      requestAnimationFrame(() => renderMessages());
+    }
     if (!socket?.connected) { renderMessages(); return; }
     requestMessages(contact.id);
   }
@@ -1353,7 +1492,7 @@
     const isMine = msg.fromId === me.id;
     const row = document.createElement('div');
     row.className = 'msg-row ' + (isMine ? 'mine' : 'other');
-    const time = new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    const time = new Date(msg.createdAt || Date.now()).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 
     // 不在着信は専用スタイル
     if (msg.isMissedCall) {
@@ -1371,14 +1510,18 @@
 
     let content = '';
     if (msg.file) {
+      // ★ URLを属性に直接埋め込む際はescapeHtmlでサニタイズ（XSS対策）
+      // onclickにはdata属性 + event delegationを使い、URL文字列をJSコンテキストに埋め込まない
+      const safeUrl  = escapeHtml(msg.file.url || '');
+      const safeName = escapeHtml(msg.file.originalName || '');
       if (msg.file.type === 'image') {
-        content += `<img class="msg-image" src="${msg.file.url}" alt="${escapeHtml(msg.file.originalName)}" onclick="openImgModal('${msg.file.url}')">`;
+        content += `<img class="msg-image" src="${safeUrl}" alt="${safeName}" data-img-url="${safeUrl}" onclick="openImgModal(this.dataset.imgUrl)">`;
       } else if (msg.file.type === 'video') {
-        content += `<video controls style="max-width:220px;border-radius:12px;display:block;margin-bottom:4px"><source src="${msg.file.url}"></video>`;
+        content += `<video controls style="max-width:220px;border-radius:12px;display:block;margin-bottom:4px"><source src="${safeUrl}"></video>`;
       } else {
         const icon = getFileIcon(msg.file.mimeType);
         const size = formatFileSize(msg.file.size);
-        content += `<a class="msg-file" href="${msg.file.url}" download="${escapeHtml(msg.file.originalName)}" target="_blank"><span class="msg-file-icon">${icon}</span><span class="msg-file-info"><span class="msg-file-name">${escapeHtml(msg.file.originalName)}</span><span class="msg-file-size">${size}</span></span></a>`;
+        content += `<a class="msg-file" href="${safeUrl}" download="${safeName}" target="_blank" rel="noopener noreferrer"><span class="msg-file-icon">${icon}</span><span class="msg-file-info"><span class="msg-file-name">${safeName}</span><span class="msg-file-size">${size}</span></span></a>`;
       }
     }
     if (msg.text) content += `<span>${linkify(escapeHtml(msg.text))}</span>`;
@@ -1408,6 +1551,8 @@
     }
   }
 
+  const MSG_CACHE_LIMIT = 300; // 1会話あたりのメモリキャップ
+
   function onNewMessage(msg) {
     const partnerId = msg.fromId === me.id ? msg.toId : msg.fromId;
     if (!messages[partnerId]) messages[partnerId] = [];
@@ -1415,6 +1560,10 @@
     const dup = messages[partnerId].some(m => (m.id || m._id?.toString()) === msgId);
     if (!dup) {
       messages[partnerId].push(msg);
+      // メモリキャップ: 300件超えたら古い方から削除
+      if (messages[partnerId].length > MSG_CACHE_LIMIT) {
+        messages[partnerId] = messages[partnerId].slice(-MSG_CACHE_LIMIT);
+      }
       if (currentContact?.id === partnerId) {
         // 全再描画せず末尾に追記するだけ
         const box = $('messages');
@@ -1478,8 +1627,11 @@
     return (bytes / 1024 / 1024).toFixed(1) + 'MB';
   }
 
-  // 画像拡大
+  // 画像拡大（★ URL安全チェック: data:image/ か /uploads/ か https:// のみ許可）
   window.openImgModal = (url) => {
+    if (!url || typeof url !== 'string') return;
+    const isSafe = url.startsWith('data:image/') || url.startsWith('/uploads/') || url.startsWith('https://');
+    if (!isSafe) return; // javascript: 等の危険なURLを弾く
     $('img-modal-img').src = url;
     $('img-modal').style.display = 'flex';
   };
@@ -1491,9 +1643,10 @@
     const name = user.displayName || user.username || '?';
     el.innerHTML = '';
     el.style.background = '';
-    if (user.avatar) {
+    const safeModalAvatar = sanitizeAvatarUrl(user.avatar); // ★ XSS対策
+    if (safeModalAvatar) {
       const img = document.createElement('img');
-      img.src = user.avatar;
+      img.src = safeModalAvatar;
       img.onerror = () => { el.innerHTML = ''; el.textContent = name[0].toUpperCase(); };
       el.appendChild(img);
     } else {
@@ -1525,12 +1678,13 @@
     const name = sender.displayName || sender.username || '?';
     _bannerFromId = msg.fromId;
 
-    // アバター
+    // アバター（★ sanitizeAvatarUrl でXSS対策）
     const av = $('inapp-banner-avatar');
     av.innerHTML = '';
-    if (sender.avatar) {
+    const safeBannerAvatar = sanitizeAvatarUrl(sender.avatar);
+    if (safeBannerAvatar) {
       const img = document.createElement('img');
-      img.src = sender.avatar;
+      img.src = safeBannerAvatar;
       img.onerror = () => { av.innerHTML = ''; av.textContent = name[0].toUpperCase(); };
       av.appendChild(img);
     } else {
@@ -1565,6 +1719,13 @@
   $('file-input').onchange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    // ★ クライアント側ファイルサイズ上限チェック（画像は20MB・その他も20MB）
+    // 大きすぎる画像はcanvas描画でブラウザOOMを引き起こす可能性がある
+    if (file.size > 20 * 1024 * 1024) {
+      showToast('ファイルサイズは20MB以下にしてください');
+      $('file-input').value = '';
+      return;
+    }
     pendingFile = file;
     $('file-preview-bar').style.display = 'flex';
     $('file-preview-name').textContent = file.name;
@@ -1590,56 +1751,67 @@
 
   $('send-btn').onclick = sendMessage;
   $('msg-input').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+  // 入力に合わせて高さ自動調整（最大3行程度）
+  $('msg-input').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
 
   let _sendLock = false;
   async function sendMessage() {
-    if (_sendLock) return; // ダブルタップ防止
+    if (_sendLock) return; // ダブルタップ・二重送信防止
     const text = $('msg-input').value.trim();
     if (!text && !pendingFile) return;
     if (!currentContact) return;
     if (!socket?.connected) { showToast('⚠️ 接続中です。しばらく待ってください'); return; }
-    _sendLock = true;
-    setTimeout(() => { _sendLock = false; }, 500); // 500ms後に解除
+    _sendLock = true; // ファイルアップロード完了まで解除しない（finallyで解除）
 
     let fileData = null;
-    if (pendingFile) {
-      try {
-        $('send-btn').textContent = '送信中';
+    try {
+      if (pendingFile) {
+        $('send-btn').innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white" style="opacity:0.5"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>';
         $('send-btn').disabled = true;
-        if (pendingFile.type.startsWith('image/')) {
-          // 画像はクライアント側でbase64化してDBに保存 → サーバー再起動でも消えない
-          const base64 = await resizeAndEncodeImage(pendingFile, 1200);
-          fileData = { url: base64, originalName: pendingFile.name, mimeType: pendingFile.type, size: pendingFile.size, type: 'image' };
-        } else {
-          const formData = new FormData();
-          formData.append('file', pendingFile);
-          const res = await fetch('/api/upload', {
-            method: 'POST',
-            headers: { Authorization: 'Bearer ' + token },
-            body: formData
-          });
-          if (!res.ok) throw new Error('upload failed');
-          fileData = await res.json();
+        try {
+          if (pendingFile.type.startsWith('image/')) {
+            // 画像はクライアント側でbase64化してDBに保存 → サーバー再起動でも消えない
+            const base64 = await resizeAndEncodeImage(pendingFile, 1600); // 高画質
+            fileData = { url: base64, originalName: pendingFile.name, mimeType: pendingFile.type, size: pendingFile.size, type: 'image' };
+          } else {
+            const formData = new FormData();
+            formData.append('file', pendingFile);
+            const res = await fetch('/api/upload', {
+              method: 'POST',
+              headers: { Authorization: 'Bearer ' + token },
+              body: formData
+            });
+            if (!res.ok) throw new Error('upload failed');
+            fileData = await res.json();
+          }
+        } catch {
+          showToast('ファイルのアップロードに失敗しました');
+          return; // finallyで _sendLock = false される
+        } finally {
+          $('send-btn').innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>';
+          $('send-btn').disabled = false;
         }
-      } catch {
-        showToast('ファイルのアップロードに失敗しました');
-        return;
-      } finally {
-        $('send-btn').textContent = '送信';
-        $('send-btn').disabled = false;
+        pendingFile = null;
+        const img = $('file-preview-img');
+        if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+        $('file-preview-bar').style.display = 'none';
       }
-      pendingFile = null;
-      const img = $('file-preview-img');
-      if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
-      $('file-preview-bar').style.display = 'none';
-    }
 
-    // 入力をクリアしてから送信（ダブルタップ時の二重送信を防ぐ）
-    $('msg-input').value = '';
-    socket.emit('sendMessage', { toUserId: currentContact.id, text, file: fileData });
+      // 入力をクリアしてから送信（ダブルタップ時の二重送信を防ぐ）
+      const inp = $('msg-input');
+      inp.value = '';
+      inp.style.height = 'auto'; // 高さをリセット
+      socket.emit('sendMessage', { toUserId: currentContact.id, text, file: fileData });
+    } finally {
+      // アップロード成功・失敗に関わらず必ずロック解除
+      _sendLock = false;
+    }
   }
 
-  function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+  function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/\n/g,'<br>'); }
 
   // ========== スワイプ削除 ==========
   let _activeSwipeWrap = null;
@@ -1707,14 +1879,18 @@
   }
 
   function linkify(html) {
-    return html.replace(/(https?:\/\/[^\s<"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all;">$1</a>');
+    return html.replace(/(https?:\/\/[^\s<"]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;word-break:break-all;">$1</a>');
   }
 
   // ========== 音声・ビデオ通話（Jitsi Meet） ==========
-  $('call-btn').onclick = () => startCall(currentContact);
+  $('call-btn').onclick = () => startCall(currentContact, false);
+  $('video-call-btn').onclick = () => startCall(currentContact, true);
 
   function generateRoomId() {
-    return 'cha-' + Math.random().toString(36).substring(2, 10);
+    // ★ 暗号論的に安全な乱数を使用（Math.random()は予測可能なため）
+    const arr = new Uint8Array(8);
+    crypto.getRandomValues(arr);
+    return 'cha-' + Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
   // ========== 着信音（ループ） ==========
@@ -1781,31 +1957,34 @@
   let callTimeoutId = null;
 
   function openCallPage(url) {
+    if (!url || typeof url !== 'string') return;
+    // ★ javascript: スキームインジェクション対策: /call? または https:// のみ許可
+    // 悪意あるユーザーが signal.jitsiUrl に javascript:... を設定してもXSSを防止
+    const trimmed = url.trim().toLowerCase();
+    if (!trimmed.startsWith('/call?') && !trimmed.startsWith('https://')) return;
     if (/iPhone|iPad|iPod/.test(navigator.userAgent)) location.href = url;
     else window.open(url, '_blank');
   }
 
-  function startCall(contact) {
+  function startCall(contact, hasVideo = false) {
     if (!socket?.connected) { showToast('⚠️ 接続中です。しばらく待ってください'); return; }
     const roomId = generateRoomId();
-    const callPageUrl = `/call?room=${roomId}`;
+    const videoParam = hasVideo ? '&video=true' : '';
+    const callPageUrl = `/call?room=${roomId}${videoParam}`;
     const fallbackUrl = `https://meet.jit.si/cha-${roomId}`;
     currentCallContact = contact;
     currentJitsiUrl = callPageUrl;
 
-    // socket で着信通知 ＋ push通知（fallbackUrlはオフライン時のJitsi）
     socket.emit('callUser', {
       toUserId: contact.id,
-      signal: { jitsiUrl: callPageUrl, fallbackUrl }
+      signal: { jitsiUrl: callPageUrl, fallbackUrl, hasVideo }
     });
 
-    // 相手の情報を call.html に渡す（localStorage経由）
     localStorage.setItem('callContact', JSON.stringify({
       name: contact.displayName || contact.username || '',
       avatar: contact.avatar || ''
     }));
-    // 発信者はすぐ通話ページへ（calleeIdを渡してiOSでも不在着信を作れるように）
-    openCallPage(`/call?room=${roomId}&initiator=true&to=${contact.id}`);
+    openCallPage(`/call?room=${roomId}&initiator=true&to=${contact.id}${videoParam}`);
 
     // 90秒で相手が応答しなければタイムアウト（15秒×6回リトライに合わせた配信遅延考慮）
     callTimeoutId = setTimeout(() => {
@@ -1824,6 +2003,8 @@
     const caller = friends.find(f => f.id === fromId) || { id: fromId, displayName: fromName, username: fromName };
     currentCallContact = caller;
     pendingJitsiUrl = signal?.jitsiUrl;
+    // ビデオ通話フラグを保持（acceptIncomingCallで使用）
+    caller._hasVideo = !!signal?.hasVideo;
 
     ringtone = createRingtone();
 
@@ -1856,8 +2037,8 @@
     if (navigator.vibrate) navigator.vibrate(0);
     socket.emit('answerCall', { toUserId: currentCallContact?.id, signal: {} });
     const url = pendingJitsiUrl;
+    const videoParam = currentCallContact?._hasVideo ? '&video=true' : '';
     pendingJitsiUrl = null;
-    // 発信者の情報を call.html に渡す
     if (currentCallContact) {
       localStorage.setItem('callContact', JSON.stringify({
         name: currentCallContact.displayName || currentCallContact.username || '',
@@ -1865,7 +2046,8 @@
       }));
     }
     closeCallModal();
-    if (url) openCallPage(url);
+    // videoParamをURLに追加（ビデオ通話なら?video=true）
+    if (url) openCallPage(url + videoParam);
   }
 
   function rejectIncomingCall() {
@@ -1895,8 +2077,15 @@
     const avatarEl = $('call-avatar-letter');
     avatarEl.classList.remove('ringing');
     const name = contact.displayName || contact.username || '?';
-    if (contact.avatar) {
-      avatarEl.innerHTML = `<img src="${contact.avatar}" onerror="this.outerHTML='${name[0].toUpperCase()}'">`;
+    const safeCallAvatar = sanitizeAvatarUrl(contact.avatar);
+    if (safeCallAvatar) {
+      // DOM操作でXSS回避（innerHTML経由でonerror属性に名前を埋め込まない）
+      const img = document.createElement('img');
+      img.src = safeCallAvatar;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+      img.onerror = () => { avatarEl.innerHTML = ''; avatarEl.textContent = name[0].toUpperCase(); };
+      avatarEl.innerHTML = '';
+      avatarEl.appendChild(img);
     } else {
       avatarEl.textContent = name[0].toUpperCase();
     }
@@ -1933,33 +2122,47 @@
   }
 
   // ========== プッシュ通知 ==========
-  async function subscribePush(reg) {
-    const keyRes = await fetch('/api/push/vapid-public-key');
-    if (!keyRes.ok) throw new Error('VAPID鍵の取得失敗');
-    const { key } = await keyRes.json();
+  async function subscribePush(reg, retryCount = 0) {
+    try {
+      const keyRes = await fetch('/api/push/vapid-public-key');
+      if (!keyRes.ok) throw new Error('VAPID鍵の取得失敗');
+      const { key } = await keyRes.json();
+      if (!key) throw new Error('VAPID鍵が空です');
 
-    const savedKey = localStorage.getItem('vapid-public-key');
-    let sub = await reg.pushManager.getSubscription();
+      const savedKey = localStorage.getItem('vapid-public-key');
+      let sub = await reg.pushManager.getSubscription();
 
-    // VAPID鍵が変わった、またはsavedKeyが未設定（旧コードの購読）→ 強制再購読
-    if (sub && (savedKey !== key)) {
-      await sub.unsubscribe();
-      sub = null;
-    }
-    localStorage.setItem('vapid-public-key', key);
+      // VAPID鍵が変わった場合 → 強制再購読
+      if (sub && savedKey !== key) {
+        await sub.unsubscribe();
+        sub = null;
+      }
+      localStorage.setItem('vapid-public-key', key);
 
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key)
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(key)
+        });
+      }
+
+      const saveRes = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(sub)
       });
+      if (!saveRes.ok) throw new Error('購読保存失敗: ' + saveRes.status);
+    } catch (e) {
+      reportError('subscribePush', e.message);
+      // 最大3回リトライ（指数バックオフ + ジッター: 1s~2s, 2s~4s, 4s~6s）
+      if (retryCount < 3) {
+        const base = 1000 * Math.pow(2, retryCount);
+        const jitter = Math.random() * 1000;
+        await new Promise(r => setTimeout(r, base + jitter));
+        return subscribePush(reg, retryCount + 1);
+      }
+      throw e;
     }
-    const saveRes = await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify(sub)
-    });
-    if (!saveRes.ok) throw new Error('購読の保存失敗');
   }
 
   // SW: ページ読み込み時に即登録・更新チェック、30分ごとに定期チェック
@@ -2112,11 +2315,14 @@
     $('loading-screen').style.display = 'none';
     $('login-screen').style.display = 'flex';
 
-    // ── iOS キーボード確実起動（standalone判定に依存しない） ─────────────
-    // iOS Safari / PWA 問わず: input直接タップでキーボードが出ない場合がある。
-    // 対策: login-form を覆う透明 <button type="button"> を1回限り設置。
-    // button click → focus() は iOS が必ずキーボードを表示するパス。
-    // isInStandaloneMode() の判定ミスを避けるため iOS全体に適用。
+    // ── iOS PWA キーボード修正 v34 ──────────────────────────────────────
+    // 問題: iOS PWA standalone モードでinputを直接タップしてもキーボードが出ない。
+    // 修正戦略:
+    //   1. 透明ボタンでinput全体を覆い、ユーザーアクションを確実に捕捉
+    //   2. focus()をremove()より先に呼ぶ（ユーザーアクション有効中）
+    //   3. readOnly=true→falseトリック：iOSがキーボードを確実に出す
+    //   4. 50ms後の再フォーカス（iOS内部処理完了を待つ）
+    //   5. 300ms後のDOMクリーンアップ
     if (isIos()) {
       const form = $('login-form');
       if (form && !form.querySelector('#_ios_kb_btn')) {
@@ -2126,18 +2332,39 @@
         btn.type = 'button';
         btn.setAttribute('aria-hidden', 'true');
         btn.style.cssText = [
-          'position:absolute', 'inset:0', 'z-index:2',
-          'background:transparent', 'border:none', 'cursor:text',
-          '-webkit-tap-highlight-color:transparent', 'touch-action:manipulation'
+          'position:absolute', 'inset:0', 'z-index:9',
+          'background:transparent', 'border:none', 'cursor:text', 'outline:none',
+          '-webkit-tap-highlight-color:transparent', 'touch-action:manipulation',
+          'user-select:none', '-webkit-user-select:none'
         ].join(';');
         form.appendChild(btn);
 
         btn.addEventListener('click', function(e) {
-          this.remove();
-          form.style.position = '';
-          const pwRect = $('password-input').getBoundingClientRect();
-          const target = (e.clientY >= pwRect.top) ? $('password-input') : $('username-input');
+          const usernameEl = $('username-input');
+          const passwordEl = $('password-input');
+          const pwRect = passwordEl.getBoundingClientRect();
+          const target = (e.clientY >= pwRect.top) ? passwordEl : usernameEl;
+
+          // ★ Step1: readOnly=false でiOSに「編集可能」と伝える
+          target.readOnly = false;
+          // ★ Step2: focus()をユーザーアクション有効中に呼ぶ（最重要）
           target.focus();
+          // ★ Step3: 50ms後に再フォーカス（iOS内部処理完了を待つ）
+          setTimeout(function() {
+            if (document.activeElement !== target) {
+              target.focus();
+              // さらに click() でiOSのカーソル配置をトリガー
+              try { target.click(); } catch {}
+            }
+          }, 50);
+          // ★ Step4: DOMから削除（focus()後なのでユーザーアクション失効なし）
+          const self = this;
+          setTimeout(function() {
+            if (self.parentNode) self.remove();
+            form.style.position = '';
+            // 最終確認: まだフォーカスが当たっていなければ再度
+            if (document.activeElement !== target) target.focus();
+          }, 300);
         }, { once: true });
       }
     }
@@ -2208,6 +2435,19 @@
   // （chat入力欄だけは従来通り touchend フォーカス）
   $('msg-input').addEventListener('touchend', function() { this.focus(); }, { passive: true });
 
+  // 改行ボタン（モバイル用）
+  $('newline-btn').addEventListener('click', function() {
+    const ta = $('msg-input');
+    const pos = ta.selectionStart;
+    const val = ta.value;
+    ta.value = val.slice(0, pos) + '\n' + val.slice(pos);
+    ta.selectionStart = ta.selectionEnd = pos + 1;
+    ta.focus();
+    // 高さを自動調整
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  });
+
 
   // ========== インストール判定ユーティリティ ==========
   function isIos() { return /iP(hone|ad|od)/.test(navigator.userAgent); }
@@ -2237,6 +2477,28 @@
 
   function closeInstallGuide() {
     $('install-guide-modal').style.display = 'none';
+  }
+
+  // ========== アプリ共有 ==========
+  async function shareApp() {
+    closeSettings();
+    const url = location.origin;
+    const shareData = {
+      title: 'CHA - チャットアプリ',
+      text: 'CHAで一緒にチャットしよう！',
+      url
+    };
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try { await navigator.share(shareData); } catch {}
+    } else {
+      // Web Share未対応: URLをコピー
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast('アプリのURLをコピーしました: ' + url);
+      } catch {
+        showToast('URL: ' + url);
+      }
+    }
   }
 
   function openInSafari() {
@@ -2324,7 +2586,13 @@
 
   // バックグラウンドから復帰したとき（iOS PWA 対応）
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState !== 'visible') {
+      // バックグラウンド: 着信中でなければAudioContextをsuspend（バッテリー節約）
+      if (_sharedAudioCtx?.state === 'running' && !_ringtoneAudio?.paused === false) {
+        _sharedAudioCtx.suspend().catch(() => {});
+      }
+      return;
+    }
     // バックグラウンドから復帰: AudioContext を再開（着信音が途切れないように）
     if (_sharedAudioCtx?.state === 'suspended') _sharedAudioCtx.resume().catch(() => {});
     if (!me) return;
@@ -2369,7 +2637,13 @@
     socket.on('messagesRead', ({ byUserId }) => {
       if (messages[byUserId]) {
         messages[byUserId].forEach(m => { if (m.fromId === me.id) m.read = true; });
-        if (currentContact?.id === byUserId) renderMessages();
+        if (currentContact?.id === byUserId) {
+          // 50ms遅延: onNewMessageより先にmessagesReadが届いた場合の競合を防ぐ
+          // （既読が最新メッセージではなく古いメッセージに付くバグの原因）
+          setTimeout(() => {
+            if (currentContact?.id === byUserId) renderMessages();
+          }, 50);
+        }
       }
     });
     socket.on('newMessage', onNewMessage);
@@ -2399,8 +2673,19 @@
       closeCallModal();
       showToast('📵 ' + (reason || '相手はオフラインです'));
     });
-    socket.on('iceCandidate', async ({ candidate }) => {
-      if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+
+    // 送信エラー（メッセージ長超過 / サーバーエラー）
+    socket.on('sendError', ({ error }) => {
+      showToast('⚠️ ' + (error || 'メッセージの送信に失敗しました'));
+    });
+
+    // ソケット切断時の表示
+    socket.on('disconnect', (reason) => {
+      // ★ 切断時にFIFOキューをリセット（再接続後に古いリクエストが紛れ込む競合を防ぐ）
+      _pendingHistoryQueue = [];
+      if (reason !== 'io client disconnect') {
+        showOfflineBar('⚠️ サーバーとの接続が切れました。再接続中...', false);
+      }
     });
   }
 
@@ -2524,7 +2809,14 @@
       }
       _qrScanAnimId = requestAnimationFrame(scan);
     } catch (e) {
-      $('qr-scan-status').textContent = 'カメラへのアクセスを許可してください';
+      const isPermError = e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError';
+      const statusEl = $('qr-scan-status');
+      if (isPermError) {
+        statusEl.innerHTML = 'カメラへのアクセスを許可してください';
+      } else {
+        // カメラデバイスエラー（ビジー等）→ リトライボタンを表示
+        statusEl.innerHTML = 'カメラを起動できませんでした。<br><button onclick="startQrScan()" style="margin-top:8px;padding:6px 16px;background:var(--green);color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">再試行</button>';
+      }
     }
   }
 

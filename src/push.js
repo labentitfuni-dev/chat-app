@@ -31,6 +31,17 @@ router.post('/subscribe', async (req, res) => {
   try {
     const { id } = jwt.verify(token, JWT_SECRET);
     const subscription = req.body;
+    // ★ subscriptionオブジェクト構造を検証（Web Push仕様: endpoint + keys.p256dh + keys.auth が必須）
+    if (!subscription || typeof subscription !== 'object' || Array.isArray(subscription)) {
+      return res.status(400).json({ error: 'subscription が不正です' });
+    }
+    if (typeof subscription.endpoint !== 'string' || !subscription.endpoint.startsWith('https://') || subscription.endpoint.length > 2048) {
+      return res.status(400).json({ error: 'endpoint が不正です' });
+    }
+    if (!subscription.keys || typeof subscription.keys !== 'object' ||
+        typeof subscription.keys.p256dh !== 'string' || typeof subscription.keys.auth !== 'string') {
+      return res.status(400).json({ error: 'subscription.keys が不正です' });
+    }
     // 同じendpointがあれば上書き、なければ新規作成
     await PushSub.findOneAndUpdate(
       { userId: id, endpoint: subscription.endpoint },
@@ -58,11 +69,20 @@ async function sendPushNotification(toUserId, payload, opts = {}) {
     try {
       await webpush.sendNotification(doc.subscription, JSON.stringify(payload), pushOptions);
     } catch (e) {
-      console.error(`[push] sendNotification failed for user ${toUserId}: status=${e.statusCode} urgency=${pushOptions.urgency} msg=${e.message}`);
-      if (e.statusCode === 410 || e.statusCode === 404 || e.statusCode === 401) {
+      const code = e.statusCode;
+      console.error(`[push] sendNotification failed for user ${toUserId}: status=${code} urgency=${pushOptions.urgency} msg=${e.message}`);
+      if (code === 410 || code === 404 || code === 401) {
+        // 購読が無効化された → DBから削除
         await PushSub.deleteOne({ _id: doc._id });
         console.log(`[push] deleted stale subscription for user ${toUserId}`);
+      } else if (code === 429) {
+        // レートリミット → 削除しない（一時的なもの）
+        console.warn(`[push] rate limited for user ${toUserId}, skipping`);
+      } else if (code === 400) {
+        // リクエスト不正 → subscriptionデータが壊れている可能性
+        console.error(`[push] bad request for user ${toUserId}, payload may be malformed`);
       }
+      // その他の一時的エラー（5xx等）はretry不要（次の送信機会に自然に再試行）
     }
   }
 }

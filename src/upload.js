@@ -14,17 +14,32 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, uuidv4() + ext);
+    // ★ 拡張子は英数字とドットのみに正規化（パストラバーサル・制御文字防止）
+    const rawExt = path.extname(file.originalname).toLowerCase();
+    const ext = rawExt.replace(/[^a-z0-9.]/g, '').slice(0, 10);
+    cb(null, uuidv4() + (ext || ''));
   }
 });
 
-// 許可する拡張子（実行ファイル等をブロック）
+// ブロックする拡張子（実行ファイル等）
 const BLOCKED_EXT = new Set([
   '.exe', '.bat', '.cmd', '.com', '.msi', '.ps1', '.vbs', '.js', '.jse',
   '.sh', '.bash', '.zsh', '.fish', '.py', '.rb', '.pl', '.php',
   '.jar', '.class', '.war', '.ear', '.apk', '.ipa',
   '.scr', '.pif', '.cpl', '.reg', '.inf', '.lnk', '.hta'
+]);
+
+// ブロックするMIMEタイプ（拡張子偽装対策）
+const BLOCKED_MIME = new Set([
+  'application/x-msdownload', 'application/x-executable',
+  'application/x-dosexec', 'application/x-msdos-program',
+  'application/x-sh', 'application/x-shellscript',
+  'text/x-shellscript', 'application/x-php', 'text/x-php',
+  'application/x-perl', 'application/x-ruby',
+  'application/x-python', 'text/x-python',
+  // ★ JavaScriptのMIMEタイプ（拡張子ブロックと組み合わせて二重防御）
+  'text/javascript', 'application/javascript', 'text/x-javascript',
+  'application/ecmascript', 'text/ecmascript',
 ]);
 
 const upload = multer({
@@ -33,6 +48,11 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (BLOCKED_EXT.has(ext)) {
+      return cb(new Error('このファイル形式はアップロードできません'));
+    }
+    // MIMEタイプも検証（拡張子偽装対策）
+    const mimeBase = file.mimetype.split(';')[0].trim().toLowerCase();
+    if (BLOCKED_MIME.has(mimeBase)) {
       return cb(new Error('このファイル形式はアップロードできません'));
     }
     cb(null, true);
@@ -61,7 +81,8 @@ router.post('/', (req, res) => {
 
     res.json({
       url: `/uploads/${req.file.filename}`,
-      originalName: req.file.originalname,
+      // ★ originalname は255文字に切り詰め（クライアント提供のため長さ制限）
+      originalName: req.file.originalname.slice(0, 255),
       mimeType: req.file.mimetype,
       size: req.file.size,
       type: isImage ? 'image' : isVideo ? 'video' : 'file'
