@@ -231,18 +231,20 @@
     let _speakerSource  = null;
     let _audioUnlocked  = false;
     let _audioWatchdog  = null;
-    let _iceRestartTimer       = null;
-    let _iceRestartCount       = 0;
-    let _iceRestartInProgress  = false; // ★ 再入防止フラグ（concurrent restart race対策）
-    let _iceCandidateQueue     = [];
-    let _sentCandidates        = [];    // ★ 送信済み候補を記録（ソケット再接続後に再送するため）
-    let _localStreamReady      = false;
-    let _localStreamWaiters    = [];
-    let _iceCheckingTimer      = null; // ICE checkingが30秒超えたらrestart
+    let _iceRestartTimer        = null;
+    let _iceRestartCount        = 0;
+    let _iceRestartInProgress   = false; // ★ 再入防止フラグ（concurrent restart race対策）
+    let _iceCandidateQueue      = [];
+    let _sentCandidates         = [];    // ★ 送信済み候補を記録（ソケット再接続後に再送するため）
+    let _localStreamReady       = false;
+    let _localStreamWaiters     = [];
+    let _iceCheckingTimer       = null; // ICE checkingが20秒超えたらrestart
     let _relayFallbackTriggered = false; // ★ relay-only フォールバック済みフラグ
-    let _keepAliveTimer     = null; // 接続後のKeep-alive監視
-    let _lastPongTime       = 0;
-    let _dataChannel        = null; // Keep-alive用DataChannel
+    let _keepAliveTimer         = null; // 接続後のKeep-alive監視
+    let _lastPongTime           = 0;
+    let _dataChannel            = null; // Keep-alive用DataChannel
+    let _callOfferLock          = false; // ★ callOffer 並列処理防止
+    let _useRelayMode           = false; // ★ callee: relay-onlyモード切替フラグ
     // デフォルトSTUN（複数ソース・冗長化）
     let iceConfig = { iceServers: [
       { urls: 'stun:stun.l.google.com:19302'  },
@@ -340,7 +342,12 @@
     window.addEventListener('online', () => {
       $('status').textContent = 'ネットワーク復帰 → 再接続中...';
       if (pc && (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected')) {
-        setTimeout(doIceRestart, 500);
+        if (isInit) {
+          setTimeout(doIceRestart, 500);
+        } else {
+          // ★ calleeもネットワーク復帰時にinitiatorへrestart要求
+          setTimeout(() => socket.emit('callNeedRestart', { roomId }), 500);
+        }
       } else if (!pc && socket.connected) {
         socket.emit('joinCallRoom', { roomId, displayName: me.displayName || me.username, avatar: me.avatar || '' });
       }
@@ -609,34 +616,58 @@
         }
       }
       $('status').textContent = '接続中...';
-      if (isInit) startWebRTC();
+      // ★ pc が既に存在する場合はICE再接続中のsocket再参加なので startWebRTC は呼ばない
+      // （socket切断→再接続時に callRoomReady が重複発火してPCが二重作成されるのを防ぐ）
+      if (isInit && !pc) startWebRTC();
     });
 
-    socket.on('callOffer', async ({ offer }) => {
+    socket.on('callOffer', async ({ offer, relayMode }) => {
+      // ★ 並列処理防止: 前のcallOfferがまだ処理中なら破棄（ICE restart時の重複処理対策）
+      if (_callOfferLock) {
+        console.warn('[callOffer] locked, discarding duplicate offer');
+        return;
+      }
+      _callOfferLock = true;
       try {
         await loadIceServers();
+        // ★ initiatorがrelay-onlyに切り替えた場合、または_useRelayModeが設定済みの場合
+        if (relayMode || _useRelayMode) {
+          iceConfig = { ...iceConfig, iceTransportPolicy: 'relay' };
+          _useRelayMode = true;
+          console.log('[callOffer] relay-only mode activated');
+        }
         await initPC();
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
         await flushIceCandidateQueue(); // ★ キュー内の候補を追加
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        // ★ アンサー側も TURN 候補が揃ってから返信（対称NAT対策）
-        await waitForIceGathering(pc, 2000);
-        socket.emit('callAnswer', { roomId, answer });
+        // ★ TURN候補が揃うまで最大3秒待ってからアンサー送信（対称NAT対策）
+        // 3秒後でも完了していなければタイムアウトして送信（接続遅延防止）
+        await waitForIceGathering(pc, 3000);
+        // ★ pc.localDescription を送信（全候補がSDPに埋め込まれた最新版）
+        // これにより相手側がaddIceCandidateなしでも全候補を受信可能
+        socket.emit('callAnswer', { roomId, answer: pc.localDescription });
       } catch (e) {
         console.error('[callOffer]', e);
-        showError('接続に失敗しました');
+        reportError('callOffer-failed', e.message);
+        // ★ エラー時はinitiatorにrestart要求（showErrorせず再試行の機会を与える）
+        socket.emit('callNeedRestart', { roomId });
+      } finally {
+        _callOfferLock = false; // 必ずロック解除
       }
     });
 
     socket.on('callAnswer', async ({ answer }) => {
       try {
         if (pc && answer) {
+          // ★ answer は callee の pc.localDescription（候補埋め込み済み）
           await pc.setRemoteDescription(new RTCSessionDescription(answer));
-          await flushIceCandidateQueue(); // ★ キュー内の候補を追加
+          // キュー内の追加候補もflush（trickle ICE互換）
+          await flushIceCandidateQueue();
         }
       } catch (e) {
         console.warn('[callAnswer]', e);
+        reportError('callAnswer-failed', e.message);
       }
     });
 
@@ -666,6 +697,24 @@
     }
 
     socket.on('callHangup', () => endCall(false));
+
+    // ★ callee からの再接続要求を受けた initiator が即座にICE restartを実行
+    socket.on('callNeedRestart', () => {
+      if (isInit) {
+        console.log('[callNeedRestart] callee requested restart');
+        // doIceRestart 自体が _iceRestartInProgress / count >= MAX のガードを持つ
+        // ここで count チェックしないことで、上限超えた場合に doIceRestart が endCall を呼べる
+        if (!_iceRestartInProgress) {
+          doIceRestart();
+        }
+      }
+    });
+
+    // ★ initiator から relay-only モード切替通知を受けた callee がフラグを設定
+    socket.on('callRelayMode', () => {
+      _useRelayMode = true;
+      console.log('[callRelayMode] switching to relay-only on next offer');
+    });
 
     // ★ 通話室が満員（3人目以降の参加を拒否）
     socket.on('callRoomFull', () => {
@@ -707,9 +756,10 @@
           }
           // 再接続後、call roomに再参加
           socket.emit('joinCallRoom', { roomId, displayName: me.displayName || me.username, avatar: me.avatar || '' });
-          await new Promise(r => setTimeout(r, 1000)); // room ready を待つ
+          await new Promise(r => setTimeout(r, 1200)); // room ready を待つ（少し長めに）
           // ★ ソケット切断中に相手が受け取れなかったICE候補を再送（候補ロスト対策）
           if (_sentCandidates.length > 0) {
+            console.log(`[ICE] re-sending ${_sentCandidates.length} candidates after socket reconnect`);
             _sentCandidates.forEach(c => socket.emit('callIceCandidate', { roomId, candidate: c }));
           }
         }
@@ -719,6 +769,8 @@
           _relayFallbackTriggered = true;
           reportError('ice-relay-fallback', `switching to relay-only at attempt ${_iceRestartCount}`);
           $('status').textContent = 'TURN経由で再接続中...';
+          // ★ callee にもrelay-onlyへの切替を通知（両側がTURN経由にならないと対称NAT突破できない）
+          socket.emit('callRelayMode', { roomId });
           // 既存PCを閉じてrelay-onlyで再作成
           if (pc) { try { pc.close(); } catch {} }
           const relayConfig = { ...iceConfig, iceTransportPolicy: 'relay' };
@@ -736,8 +788,35 @@
           pc.oniceconnectionstatechange = () => {
             if (!pc) return;
             const s = pc.iceConnectionState;
-            if (s === 'connected' || s === 'completed') { onCallConnected(); startKeepAlive(); startAudioWatchdog(); }
+            if (s === 'checking') {
+              // ★ relay PCでもcheckingタイムアウトを監視（20秒で諦める）
+              if (_iceCheckingTimer) clearTimeout(_iceCheckingTimer);
+              _iceCheckingTimer = setTimeout(() => {
+                if (pc && pc.iceConnectionState === 'checking') {
+                  reportError('ice-relay-timeout', 'relay checking > 20s → give up');
+                  $('status').textContent = '接続できませんでした。通話を終了します';
+                  setTimeout(() => endCall(false), 2000);
+                }
+              }, 20000);
+            }
+            if (s === 'connected' || s === 'completed') {
+              if (_iceCheckingTimer) { clearTimeout(_iceCheckingTimer); _iceCheckingTimer = null; }
+              onCallConnected(); startKeepAlive(); startAudioWatchdog();
+            }
+            if (s === 'disconnected') {
+              // ★ relay PC切断 → 短時間で諦める（relay失敗は回復困難）
+              $('status').textContent = '再接続中...';
+              if (_iceRestartTimer) clearTimeout(_iceRestartTimer);
+              _iceRestartTimer = setTimeout(() => {
+                if (pc && (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')) {
+                  reportError('ice-relay-disconnected', 'relay mode disconnected → give up');
+                  $('status').textContent = '接続できませんでした。通話を終了します';
+                  setTimeout(() => endCall(false), 2000);
+                }
+              }, 8000);
+            }
             if (s === 'failed') {
+              if (_iceCheckingTimer) { clearTimeout(_iceCheckingTimer); _iceCheckingTimer = null; }
               reportError('ice-relay-failed', 'relay mode also failed');
               $('status').textContent = '接続できませんでした';
               setTimeout(() => endCall(false), 2000);
@@ -746,7 +825,11 @@
           pc.ontrack = e => {
             const stream = e.streams[0] || new MediaStream([e.track]);
             const audio = $('remote-audio');
-            if (e.track.kind === 'video') { const rv = $('remote-video'); if (rv) { rv.srcObject = stream; rv.play().catch(()=>{}); } return; }
+            if (e.track.kind === 'video') {
+              const rv = $('remote-video');
+              if (rv) { rv.srcObject = stream; rv.play().catch(() => {}); $('video-overlay').style.display = 'flex'; }
+              return;
+            }
             if (audio.srcObject && audio.srcObject.id === stream.id) return;
             audio.srcObject = stream; audio.volume = 1.0; audio.muted = isSpeakerOn;
             tryPlayAudio(audio);
@@ -759,9 +842,22 @@
               const audio = $('remote-audio');
               if (audio.srcObject && !isSpeakerOn) tryPlayAudio(audio);
             }
+            if (pc.connectionState === 'failed') {
+              // ★ relay PC の DTLS/接続失敗 → 通話終了（これ以上の回復手段がない）
+              reportError('relay-conn-failed', 'relay connectionState failed');
+              $('status').textContent = '接続できませんでした。通話を終了します';
+              setTimeout(() => endCall(false), 2000);
+            }
           };
-          // ★ DataChannel受信（受信側はondatachannelで取得）
-          if (!isInit) {
+          // ★ DataChannel（keepalive用）— relay fallback PC でも再設定
+          _dataChannel = null; // 旧チャンネルをリセット
+          if (isInit) {
+            try {
+              _dataChannel = pc.createDataChannel('keepalive', { ordered: false, maxRetransmits: 0 });
+              _dataChannel.onmessage = () => { _lastPongTime = Date.now(); };
+              _dataChannel.onerror  = () => {};
+            } catch {}
+          } else {
             pc.ondatachannel = (e) => {
               _dataChannel = e.channel;
               _dataChannel.onmessage = (ev) => {
@@ -775,8 +871,11 @@
         const offer = await pc.createOffer({ iceRestart: !_relayFallbackTriggered });
         await pc.setLocalDescription(offer);
         // ★ ICE restart時もTURN候補が揃うまで待つ（relay fallback時に特に重要）
-        await waitForIceGathering(pc, 2000);
-        socket.emit('callOffer', { roomId, offer });
+        // relay fallback時は5秒、通常は3秒待つ（TURN取得に時間がかかる場合を考慮）
+        await waitForIceGathering(pc, _relayFallbackTriggered ? 5000 : 3000);
+        // ★ pc.localDescription（候補埋め込み済みSDP）を送信
+        // relayMode フラグを付与してcalleeにも relay-only を使わせる
+        socket.emit('callOffer', { roomId, offer: pc.localDescription, relayMode: _relayFallbackTriggered });
       } catch (e) {
         reportError('doIceRestart', e.message);
       } finally {
@@ -875,14 +974,19 @@
         const s = pc.iceConnectionState;
         if (s === 'checking') {
           $('status').textContent = '接続中...';
-          // ★ 30秒以上checkingならICE restart（NAT越えに失敗している場合）
+          // ★ 20秒以上checkingならICE restart（NAT越えに失敗している場合）
+          // initiatorは自分でrestart、calleeはinitiatorにrestart要求を送る
           if (_iceCheckingTimer) clearTimeout(_iceCheckingTimer);
           _iceCheckingTimer = setTimeout(() => {
             if (pc && pc.iceConnectionState === 'checking') {
-              reportError('ice-timeout', 'checking > 30s → restart');
+              reportError('ice-timeout', `checking > 20s → restart (init=${isInit})`);
               if (isInit) doIceRestart();
+              else {
+                $('status').textContent = '再接続を要求中...';
+                socket.emit('callNeedRestart', { roomId });
+              }
             }
-          }, 30000);
+          }, 20000);
         }
         if (s === 'connected' || s === 'completed') {
           if (_iceCheckingTimer) { clearTimeout(_iceCheckingTimer); _iceCheckingTimer = null; }
@@ -896,14 +1000,28 @@
           $('status').textContent = '再接続中...';
           stopKeepAlive();
           if (_iceRestartTimer) clearTimeout(_iceRestartTimer);
-          // 4秒後にICE再接続
-          if (isInit) _iceRestartTimer = setTimeout(doIceRestart, 4000);
+          if (isInit) {
+            // initiatorは4秒後に自分でrestart
+            _iceRestartTimer = setTimeout(doIceRestart, 4000);
+          } else {
+            // ★ calleeも4秒後にinitiatorへrestart要求（calleeが先に disconnected に気づいた場合）
+            _iceRestartTimer = setTimeout(() => {
+              if (pc && (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')) {
+                socket.emit('callNeedRestart', { roomId });
+              }
+            }, 4000);
+          }
         }
         if (s === 'failed') {
           stopKeepAlive();
-          reportError('ice-failed', `restart#${_iceRestartCount}`);
-          if (isInit) doIceRestart();
-          else $('status').textContent = '接続が切れました';
+          reportError('ice-failed', `restart#${_iceRestartCount} isInit=${isInit}`);
+          if (isInit) {
+            doIceRestart();
+          } else {
+            // ★ calleeはinitiatorにrestart要求を送る（calleeはofferを作れないため）
+            $('status').textContent = '再接続を要求中...';
+            socket.emit('callNeedRestart', { roomId });
+          }
         }
       };
 
@@ -919,7 +1037,17 @@
             if (audio.srcObject) tryPlayAudio(audio);
           }
         }
-        if (s === 'failed' && isInit) doIceRestart();
+        if (s === 'failed') {
+          // ★ connectionState 'failed' も ICE failure と同様に処理（DTLSなどの失敗をカバー）
+          reportError('connection-failed', `isInit=${isInit}`);
+          if (isInit) {
+            doIceRestart();
+          } else {
+            // ★ callee は initiator に restart 要求を送る
+            $('status').textContent = '再接続を要求中...';
+            socket.emit('callNeedRestart', { roomId });
+          }
+        }
       };
     }
 
@@ -952,10 +1080,11 @@
         await initPC();
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        // ★ TURN候補が収集されるまで最大2秒待ってからオファー送信
-        // （早すぎると対称NATのrelay候補が揃わず接続失敗の原因になる）
-        await waitForIceGathering(pc, 2000);
-        socket.emit('callOffer', { roomId, offer });
+        // ★ TURN候補が収集されるまで最大3秒待ってからオファー送信
+        // pc.localDescription（候補埋め込み済み最新SDP）を送ることで
+        // callee側のaddIceCandidate依存を減らし、候補ロストによる接続失敗を防ぐ
+        await waitForIceGathering(pc, 3000);
+        socket.emit('callOffer', { roomId, offer: pc.localDescription });
       } catch (e) {
         if (e.message !== 'mic denied') showError('通話の開始に失敗しました');
       }
@@ -1006,7 +1135,14 @@
       if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
       if (localStream)   { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
       if (pc)            { pc.close(); pc = null; }
-      _iceCandidateQueue = [];
+      // ★ 次回通話のためにフラグをリセット（relay modeが次通話に引き継がれるバグを防ぐ）
+      _iceCandidateQueue      = [];
+      _sentCandidates         = [];
+      _callOfferLock          = false;
+      _iceRestartInProgress   = false;
+      _useRelayMode           = false;
+      _relayFallbackTriggered = false;
+      _iceRestartCount        = 0;
       if (_speakerSource) { try { _speakerSource.disconnect(); } catch {} _speakerSource = null; }
       const rv = $('remote-video'); if (rv) rv.srcObject = null;
       const lv = $('local-video');  if (lv) lv.srcObject = null;
@@ -1043,6 +1179,29 @@
     }
 
     window.addEventListener('beforeunload', () => { if (pc) endCall(true); });
+
+    // ★ バックグラウンド復帰時のICE状態チェック（iOS Safariはバックグラウンドで接続が切れやすい）
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return; // バックグラウンドに入る時は何もしない
+      if (!pc) return;
+      const iceState = pc.iceConnectionState;
+      const connState = pc.connectionState;
+      console.log(`[visibility] restored. ice=${iceState} conn=${connState}`);
+      // 接続が切れている場合は復帰処理
+      if (iceState === 'failed' || iceState === 'disconnected' || connState === 'failed' || connState === 'disconnected') {
+        $('status').textContent = '再接続中...';
+        if (isInit) {
+          setTimeout(doIceRestart, 500);
+        } else {
+          socket.emit('callNeedRestart', { roomId });
+        }
+      }
+      // 音声が止まっている場合は再生を試みる
+      const audio = $('remote-audio');
+      if (audio && audio.srcObject && audio.paused && !isSpeakerOn) {
+        audio.play().catch(() => { $('audio-banner').style.display = 'flex'; });
+      }
+    });
 
     // 音声バナー: 1秒後に自動再生が成功しなかった場合のみ表示する
     // （Desktop: 一瞬チラつきを防ぐ / iOS: 確実に表示）

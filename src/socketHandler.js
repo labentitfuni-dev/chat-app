@@ -333,11 +333,11 @@ function setupSocket(io) {
       }
     });
 
-    socket.on('callOffer', ({ roomId, offer }) => {
+    socket.on('callOffer', ({ roomId, offer, relayMode }) => {
       if (typeof roomId !== 'string' || !roomId.trim()) return;
       // ★ offer はWebRTC SDPオブジェクト（通常1〜10KB）—オブジェクトのみ許可
       if (!offer || typeof offer !== 'object' || Array.isArray(offer)) return;
-      socket.to('call-' + roomId).emit('callOffer', { offer });
+      socket.to('call-' + roomId).emit('callOffer', { offer, relayMode: !!relayMode });
     });
 
     socket.on('callAnswer', ({ roomId, answer }) => {
@@ -352,6 +352,18 @@ function setupSocket(io) {
       // ★ candidate はnullまたはオブジェクト（ICE gathering完了時はnull）
       if (candidate !== null && (typeof candidate !== 'object' || Array.isArray(candidate))) return;
       socket.to('call-' + roomId).emit('callIceCandidate', { candidate });
+    });
+
+    // ★ callee → initiator: ICE失敗時にrestartを要求（calleeはofferを作れないため）
+    socket.on('callNeedRestart', ({ roomId }) => {
+      if (typeof roomId !== 'string' || !roomId.trim()) return;
+      socket.to('call-' + roomId).emit('callNeedRestart');
+    });
+
+    // ★ initiator → callee: relay-onlyモードへの切替通知
+    socket.on('callRelayMode', ({ roomId }) => {
+      if (typeof roomId !== 'string' || !roomId.trim()) return;
+      socket.to('call-' + roomId).emit('callRelayMode');
     });
 
     socket.on('callHangup', ({ roomId }) => {
