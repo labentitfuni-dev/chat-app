@@ -61,6 +61,7 @@ function makeRateLimiter(maxPerWindow, windowMs) {
 }
 
 const msgRateLimit    = makeRateLimiter(30, 10000);  // 10秒に30件まで
+const getMsgLimit     = makeRateLimiter(20, 10000);  // 10秒に20件まで（getMessagesスパム対策）
 const deleteRateLimit = makeRateLimiter(10, 10000);  // 10秒に10件まで
 const markReadLimit   = makeRateLimiter(20, 5000);   // 5秒に20件まで
 const callRateLimit   = makeRateLimiter(3,  60000);  // 1分に3件まで（call spam対策）
@@ -84,6 +85,8 @@ function setupSocket(io) {
 
     socket.on('getMessages', async ({ toUserId }) => {
       if (typeof toUserId !== 'string' || !toUserId.trim()) return; // ★ 型チェック（NoSQLインジェクション対策）
+      if (!/^[0-9a-fA-F]{24}$/.test(toUserId)) return; // ★ ObjectId形式チェック（無効IDでのDB負荷防止）
+      if (!getMsgLimit(socket.id)) return; // ★ レートリミット（getMessagesスパムでのDB過負荷防止）
       try {
         // 最新200件を取得（降順で取りreverse → 昇順で返す）
         const msgs = await Message.find({
@@ -119,6 +122,7 @@ function setupSocket(io) {
 
     socket.on('deleteChatHistory', async ({ withUserId }) => {
       if (typeof withUserId !== 'string' || !withUserId.trim()) return; // 型チェック
+      if (!/^[0-9a-fA-F]{24}$/.test(withUserId)) return; // ★ ObjectId形式チェック
       try {
         // 自分だけのソフトデリート: deletedFor に自分のIDを追加
         // 相手のメッセージ履歴はそのまま残る
@@ -221,9 +225,11 @@ function setupSocket(io) {
         // アプリ起動中ならsocketで着信通知
         io.to(toSocketId).emit('incomingCall', { fromId: socket.userId, fromName: socket.username, signal });
       }
-      // ★ callUrl は必ず文字列に正規化（signalにオブジェクト等が来ても安全）
+      // ★ callUrl: 自サービスの /call? パスのみ許可（外部URL・フィッシング防止）
+      // signal.jitsiUrl = '/call?room=...' 形式の相対パスのみ有効とみなす
       const rawCallUrl = signal?.jitsiUrl || signal?.fallbackUrl;
-      const callUrl = typeof rawCallUrl === 'string' ? rawCallUrl.slice(0, 2000) : null;
+      const callUrl = (typeof rawCallUrl === 'string' && /^\/call\?/.test(rawCallUrl))
+        ? rawCallUrl.slice(0, 500) : null;
       const callKey = `${socket.userId}:${toUserId}`;
       const pushPayload = {
         title: '📞 ' + socket.username,
@@ -257,6 +263,7 @@ function setupSocket(io) {
 
     socket.on('answerCall', ({ toUserId, signal }) => {
       if (typeof toUserId !== 'string' || !toUserId.trim()) return; // 型チェック
+      if (!/^[0-9a-fA-F]{24}$/.test(toUserId)) return; // ★ ObjectId形式チェック
       const s = getSocketId(toUserId);
       if (s) io.to(s).emit('callAccepted', { signal });
       // 応答されたのでリトライを停止
@@ -268,6 +275,7 @@ function setupSocket(io) {
     // reason:'rejected' または未指定 = 受信者が手動で拒否
     socket.on('rejectCall', async ({ toUserId, reason }) => {
       if (typeof toUserId !== 'string' || !toUserId.trim()) return; // 型チェック
+      if (!/^[0-9a-fA-F]{24}$/.test(toUserId)) return; // ★ ObjectId形式チェック（不在着信メッセージのtoId汚染防止）
       const s = getSocketId(toUserId);
       if (s) io.to(s).emit('callRejected', { reason });
       // 拒否・タイムアウトでリトライを停止（発信者側のpendingCallKey）

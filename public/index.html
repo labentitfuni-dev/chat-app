@@ -1977,6 +1977,7 @@
   }
 
   function startCall(contact, hasVideo = false) {
+    if (!contact) { showToast('⚠️ 通話相手が選択されていません'); return; }
     if (!socket?.connected) { showToast('⚠️ 接続中です。しばらく待ってください'); return; }
     const roomId = generateRoomId();
     const videoParam = hasVideo ? '&video=true' : '';
@@ -2598,7 +2599,8 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') {
       // バックグラウンド: 着信中でなければAudioContextをsuspend（バッテリー節約）
-      if (_sharedAudioCtx?.state === 'running' && !_ringtoneAudio?.paused === false) {
+      // ★ 修正: !x?.y === false は演算子優先順位バグ。 (!_ringtoneAudio || _ringtoneAudio.paused) で正しく評価
+      if (_sharedAudioCtx?.state === 'running' && (!_ringtoneAudio || _ringtoneAudio.paused)) {
         _sharedAudioCtx.suspend().catch(() => {});
       }
       return;
