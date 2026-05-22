@@ -1968,10 +1968,9 @@
 
   function openCallPage(url) {
     if (!url || typeof url !== 'string') return;
-    // ★ javascript: スキームインジェクション対策: /call? または https:// のみ許可
-    // 悪意あるユーザーが signal.jitsiUrl に javascript:... を設定してもXSSを防止
-    const trimmed = url.trim().toLowerCase();
-    if (!trimmed.startsWith('/call?') && !trimmed.startsWith('https://')) return;
+    // ★ ネイティブWebRTCのみ対応: /call? 相対パスのみ許可
+    // https:// URL（旧Jitsi fallback）は不要になったため排除（外部URL注入・フィッシング防止）
+    if (!url.trim().startsWith('/call?')) return;
     if (/iPhone|iPad|iPod/.test(navigator.userAgent)) location.href = url;
     else window.open(url, '_blank');
   }

@@ -207,5 +207,15 @@ const PORT = process.env.PORT || 3000;
 connectDB().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`サーバー起動中: http://localhost:${PORT}`);
+    // ★ 本番環境では必ず環境変数を設定してください
+    if (!process.env.JWT_SECRET) {
+      console.warn('[SECURITY] ⚠️  JWT_SECRET が未設定です。デフォルト値を使用中（本番環境では必ず設定してください）');
+    }
+    if (!process.env.VAPID_PUBLIC || !process.env.VAPID_PRIVATE) {
+      console.warn('[SECURITY] ⚠️  VAPID_PUBLIC/VAPID_PRIVATE が未設定です。ハードコード値を使用中（GitHubで公開されているため本番では危険です）');
+    }
+    if (ALLOWED_ORIGIN === '*') {
+      console.warn('[SECURITY] ⚠️  ALLOWED_ORIGIN が未設定です。全オリジンを許可中（本番では https://your-domain.com を設定してください）');
+    }
   });
 });
