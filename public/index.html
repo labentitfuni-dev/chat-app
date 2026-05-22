@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CHA">
-  <meta name="app-version" content="v48">
+  <meta name="app-version" content="v49">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
@@ -2213,6 +2213,9 @@
       btns.appendChild(wrap);
     });
     $('call-modal').style.display = 'flex';
+    // ★ Screen Wake Lock: 着信中は画面消灯・自動ロックを阻止
+    // アプリがフォアグラウンドにある限り全画面着信UIが表示され続ける
+    _acquireWakeLock();
   }
 
   function closeCallModal() {
@@ -2225,6 +2228,24 @@
     $('call-modal').classList.remove('incoming');
     $('call-modal').style.display = 'none';
     currentCallContact = null;
+    // ★ 通話終了でウェイクロック解除
+    _releaseWakeLock();
+  }
+
+  // ========== Screen Wake Lock（着信中の画面消灯防止） ==========
+  let _wakeLock = null;
+
+  async function _acquireWakeLock() {
+    if (!('wakeLock' in navigator)) return; // 非対応ブラウザはスキップ
+    try {
+      _wakeLock = await navigator.wakeLock.request('screen');
+      // ページ非表示などでOSがロックを強制解放した場合の追跡
+      _wakeLock.addEventListener('release', () => { _wakeLock = null; });
+    } catch {} // 省電力モード等で拒否される場合は無視
+  }
+
+  function _releaseWakeLock() {
+    if (_wakeLock) { _wakeLock.release().catch(() => {}); _wakeLock = null; }
   }
 
   // ========== プッシュ通知 ==========
@@ -2723,6 +2744,10 @@
     // バックグラウンドで音が出なかった場合のリカバリー
     if ($('call-modal').style.display === 'flex' && !ringtone) {
       ringtone = createRingtone();
+    }
+    // ★ ウェイクロックはOS/ブラウザがページ非表示時に強制解放するため復帰時に再取得
+    if ($('call-modal').style.display === 'flex') {
+      _acquireWakeLock();
     }
 
     // ★ キープアライブが途切れていたら再開（バックグラウンドでiOSに止められた場合）

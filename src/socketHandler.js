@@ -245,17 +245,40 @@ function setupSocket(io) {
       // 1回目（即時）
       sendPushNotification(toUserId, pushPayload, { urgency: 'high', TTL: 120 });
 
-      // 10秒ごとに最大8回リトライ（合計9回）→ 90秒間カバー（着信ラグ削減）
+      // ★ 仕様の穴を突く: iOSはpushが届くたびに通知音を鳴らす
+      // 4秒ごとに送ることでロック画面上で「電話が鳴り続ける」体験を実現
+      // （LINEのCallKit相当の効果を push の高頻度化で近似）
+      // - 最初の20回(80秒)は4秒間隔 → 積極的着信音
+      // - その後は10秒間隔で5回(50秒) → 合計最大2分強カバー
       let retryCount = 0;
-      const intervalId = setInterval(() => {
+      const FAST_LIMIT = 20;   // 最初の20回: 4秒間隔
+      const FAST_MS    = 4000;
+      const SLOW_MS    = 10000;
+      const TOTAL_MAX  = 25;
+
+      let intervalId = setInterval(() => {
         retryCount++;
-        if (retryCount >= 9 || !pendingCallIntervals.has(callKey)) {
+        if (retryCount > TOTAL_MAX || !pendingCallIntervals.has(callKey)) {
           clearPendingCall(callKey);
           return;
         }
-        const remainTTL = Math.max(120 - retryCount * 10, 15);
+        const remainTTL = Math.max(15, 120 - retryCount * 4);
         sendPushNotification(toUserId, pushPayload, { urgency: 'high', TTL: remainTTL });
-      }, 10000);
+
+        // ★ 20回目以降は間隔を10秒に切り替え
+        if (retryCount === FAST_LIMIT) {
+          clearInterval(intervalId);
+          intervalId = setInterval(() => {
+            retryCount++;
+            if (retryCount > TOTAL_MAX || !pendingCallIntervals.has(callKey)) {
+              clearPendingCall(callKey);
+              return;
+            }
+            sendPushNotification(toUserId, pushPayload, { urgency: 'high', TTL: 30 });
+          }, SLOW_MS);
+          pendingCallIntervals.set(callKey, intervalId);
+        }
+      }, FAST_MS);
 
       pendingCallIntervals.set(callKey, intervalId);
       socket.pendingCallKey = callKey;
